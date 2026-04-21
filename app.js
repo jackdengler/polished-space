@@ -167,7 +167,11 @@
     if (!res.ok) {
       setSync("err");
       const txt = await res.text();
-      throw new Error(`PUT ${res.status}: ${txt}`);
+      let hint = "";
+      if (res.status === 401) hint = " — token is invalid or expired.";
+      else if (res.status === 403) hint = " — token is missing Contents: Write permission on this repo.";
+      else if (res.status === 404) hint = " — repo or branch not found (is this repo private with no access?).";
+      throw new Error(`Save failed (HTTP ${res.status})${hint}\n\n${txt.slice(0, 300)}`);
     }
     const json = await res.json();
     state.sha = json.content.sha;
@@ -355,7 +359,7 @@
     try {
       await saveRemote(`${wasDone ? "undo" : "done"}: ${c.title}`);
     } catch (err) {
-      alert("Sync failed — please refresh.");
+      alert(err.message || "Sync failed — please refresh.");
     }
   }
 
@@ -418,7 +422,7 @@
     try {
       await saveRemote(id ? `edit: ${payload.title}` : `add: ${payload.title}`);
     } catch (err) {
-      alert("Sync failed — please refresh.");
+      alert(err.message || "Sync failed — please refresh.");
     }
   });
 
@@ -434,7 +438,7 @@
     try {
       await saveRemote(`delete: ${title}`);
     } catch (err) {
-      alert("Sync failed — please refresh.");
+      alert(err.message || "Sync failed — please refresh.");
     }
   });
 
@@ -479,7 +483,7 @@
     try {
       await saveRemote("update names");
     } catch (err) {
-      alert("Sync failed — please refresh.");
+      alert(err.message || "Sync failed — please refresh.");
     }
   });
 
