@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#7c5cff" />
+  <title>Our Chores</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Setup screen -->
+    <section id="setup" class="screen hidden">
+      <div class="card">
+        <h1>Welcome 💫</h1>
+        <p class="muted">
+          This is a little chore tracker synced through GitHub.
+          You'll need a <strong>Personal Access Token</strong> (PAT) the first
+          time on each device.
+        </p>
+        <details>
+          <summary>How do I make a PAT?</summary>
+          <ol>
+            <li>Go to <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+            <li>Resource owner: <code>jackdengler</code></li>
+            <li>Repository access: <em>Only select repositories</em> → <code>polished-space</code></li>
+            <li>Permissions → Repository permissions → <strong>Contents: Read and write</strong></li>
+            <li>Generate, copy the token, paste below</li>
+          </ol>
+        </details>
+
+        <form id="setup-form">
+          <label>
+            GitHub token
+            <input type="password" id="token-input" placeholder="github_pat_…" autocomplete="off" required />
+          </label>
+          <label>
+            Who are you?
+            <select id="whoami-select" required></select>
+          </label>
+          <button type="submit" class="primary">Save &amp; sync</button>
+          <p id="setup-error" class="error" role="alert"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- Main screen -->
+    <section id="main" class="screen hidden">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">✦</span>
+          <span>Our Chores</span>
+        </div>
+        <div class="topbar-actions">
+          <span id="sync-indicator" class="sync" title="Sync status"></span>
+          <button id="settings-btn" class="ghost" aria-label="Settings">⚙</button>
+        </div>
+      </header>
+
+      <div class="scoreboard" id="scoreboard"></div>
+
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-filter="today">Today</button>
+        <button class="tab" data-filter="all">All</button>
+        <button class="tab" data-filter="done">Done</button>
+      </nav>
+
+      <main class="chore-list" id="chore-list"></main>
+
+      <button id="add-btn" class="fab" aria-label="Add chore">＋</button>
+    </section>
+
+    <!-- Add/edit modal -->
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <h2 id="modal-title">New chore</h2>
+        <form id="chore-form">
+          <input type="hidden" id="chore-id" />
+          <label>
+            Title
+            <input type="text" id="chore-title" required maxlength="80" placeholder="e.g. Take out trash" />
+          </label>
+          <label>
+            Assigned to
+            <select id="chore-assignee" required></select>
+          </label>
+          <label>
+            Repeats
+            <select id="chore-recurrence">
+              <option value="none">One time</option>
+              <option value="daily" selected>Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </label>
+          <label>
+            Points
+            <input type="number" id="chore-points" value="1" min="0" max="20" />
+          </label>
+          <div class="modal-actions">
+            <button type="button" id="chore-delete" class="danger hidden">Delete</button>
+            <div class="spacer"></div>
+            <button type="button" id="chore-cancel" class="ghost">Cancel</button>
+            <button type="submit" class="primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <h2>Settings</h2>
+        <form id="settings-form">
+          <label>
+            Your name
+            <input type="text" id="settings-my-name" required maxlength="30" />
+          </label>
+          <label>
+            Partner's name
+            <input type="text" id="settings-partner-name" required maxlength="30" />
+          </label>
+          <label>
+            Who are you?
+            <select id="settings-whoami" required></select>
+          </label>
+          <div class="modal-actions">
+            <button type="button" id="settings-logout" class="danger">Log out</button>
+            <div class="spacer"></div>
+            <button type="button" id="settings-cancel" class="ghost">Cancel</button>
+            <button type="submit" class="primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
