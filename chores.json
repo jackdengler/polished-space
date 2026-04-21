@@ -1,7 +1,25 @@
 {
   "users": [
-    { "id": "u1", "name": "Me", "color": "#7c5cff" },
-    { "id": "u2", "name": "Partner", "color": "#ff6b9d" }
+    {
+      "id": "u1",
+      "name": "Me",
+      "color": "#7c5cff"
+    },
+    {
+      "id": "u2",
+      "name": "Partner",
+      "color": "#ff6b9d"
+    }
   ],
-  "chores": []
+  "chores": [
+    {
+      "id": "cmo873jjt8nny8",
+      "title": "Make Bed",
+      "assignedTo": "u1",
+      "recurrence": "daily",
+      "points": 1,
+      "lastCompletedAt": null,
+      "history": []
+    }
+  ]
 }
