@@ -18,8 +18,13 @@
       "assignedTo": "u1",
       "recurrence": "daily",
       "points": 1,
-      "lastCompletedAt": null,
-      "history": []
+      "lastCompletedAt": 1776750039325,
+      "history": [
+        {
+          "userId": "u1",
+          "at": 1776750039325
+        }
+      ]
     }
   ]
 }
