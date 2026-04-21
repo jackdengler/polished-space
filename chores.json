@@ -1,15 +1,7 @@
 {
   "users": [
-    {
-      "id": "u1",
-      "name": "Jack",
-      "color": "#5b8def"
-    },
-    {
-      "id": "u2",
-      "name": "Jordan",
-      "color": "#ff6b9d"
-    }
+    { "id": "u1", "name": "Jack", "color": "#5b8def" },
+    { "id": "u2", "name": "Jordan", "color": "#ff6b9d" }
   ],
   "chores": [
     {
@@ -18,11 +10,11 @@
       "assignedTo": "u1",
       "recurrence": "daily",
       "points": 1,
-      "lastCompletedAt": 1776751198989,
+      "lastCompletedAt": 1776750039325,
       "history": [
         {
           "userId": "u1",
-          "at": 1776751198989
+          "at": 1776750039325
         }
       ]
     }
