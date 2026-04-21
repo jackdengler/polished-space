@@ -24,6 +24,10 @@
 
 * { box-sizing: border-box; }
 
+html {
+  color-scheme: light;
+}
+
 html, body {
   margin: 0;
   padding: 0;
