@@ -11,8 +11,8 @@
 
   const defaultData = () => ({
     users: [
-      { id: "u1", name: "Me", color: "#7c5cff" },
-      { id: "u2", name: "Partner", color: "#ff6b9d" },
+      { id: "u1", name: "Jack", color: "#5b8def" },
+      { id: "u2", name: "Jordan", color: "#ff6b9d" },
     ],
     chores: [],
   });
@@ -244,20 +244,31 @@
       }
     }
     const max = Math.max(...Object.values(scores), 0);
+    const tied = Object.values(scores).filter((v) => v === max).length > 1;
     el.scoreboard.innerHTML = "";
     for (const u of state.data.users) {
-      const leader = max > 0 && scores[u.id] === max;
+      const leader = max > 0 && !tied && scores[u.id] === max;
+      const isYou = state.whoami === u.id;
       const div = document.createElement("div");
-      div.className = "score-card" + (leader ? " leader" : "");
+      div.className = "score-card" + (leader ? " leader" : "") + (isYou ? " you" : "");
+      div.style.setProperty("--user-tint", hexToRgba(u.color, 0.07));
+      const score = scores[u.id];
       div.innerHTML = `
         <div class="name"><span class="dot" style="background:${escapeAttr(
           u.color
-        )}"></span>${escapeHtml(u.name)}</div>
-        <div class="score">${scores[u.id]}</div>
-        <div class="sub">pts this week</div>
+        )}"></span>${escapeHtml(u.name)}${isYou ? " (you)" : ""}</div>
+        <div class="score">${score}</div>
+        <div class="sub">${score === 1 ? "point" : "points"} this week</div>
       `;
       el.scoreboard.appendChild(div);
     }
+  }
+
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace("#", "");
+    const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   function renderList() {
@@ -280,15 +291,27 @@
     if (chores.length === 0) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.innerHTML = `<span class="big">🌱</span>${
-        filter === "done" ? "Nothing finished yet." : "No chores here — add one!"
-      }`;
+      const msg = filter === "done"
+        ? { emoji: "🛁", main: "Nothing finished yet.", sub: "Get one done to start the streak." }
+        : filter === "today"
+        ? { emoji: "🌤️", main: "All clear for today!", sub: "Add a new chore with the + button." }
+        : { emoji: "🌱", main: "No chores yet.", sub: "Tap + to add your first one." };
+      empty.innerHTML = `<span class="big">${msg.emoji}</span>${msg.main}<div class="small">${msg.sub}</div>`;
       el.list.appendChild(empty);
       return;
     }
 
+    let lastSection = null;
     for (const c of chores) {
       const done = isChoreDone(c);
+      const section = done ? "Done" : "To do";
+      if (section !== lastSection) {
+        const h = document.createElement("div");
+        h.className = "section-header";
+        h.textContent = section;
+        el.list.appendChild(h);
+        lastSection = section;
+      }
       const assignee = userById(c.assignedTo);
       const row = document.createElement("div");
       row.className = "chore" + (done ? " done" : "");
@@ -304,9 +327,7 @@
               <span class="assignee-name"></span>
             </span>
             <span class="recurrence"></span>
-            <span class="points">+${c.points || 1} pt${
-              (c.points || 1) === 1 ? "" : "s"
-            }</span>
+            <span class="points">+${c.points || 1}</span>
           </div>
         </div>
       `;
