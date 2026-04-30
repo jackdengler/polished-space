@@ -1,6 +1,6 @@
 (() => {
   const REPO_OWNER = "jackdengler";
-  const REPO_NAME = "polished-space";
+  const REPO_NAME = "private-data-storage";
   const DATA_PATH = "chores.json";
   const BRANCH = "main";
   const API_BASE = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DATA_PATH}`;
@@ -17,7 +17,6 @@
     chores: [],
   });
 
-  // --- State ---
   let state = {
     token: localStorage.getItem(LS_TOKEN) || "",
     whoami: localStorage.getItem(LS_WHOAMI) || "",
@@ -27,7 +26,6 @@
     lastSync: 0,
   };
 
-  // --- DOM refs ---
   const $ = (id) => document.getElementById(id);
   const el = {
     setup: $("setup"),
@@ -64,7 +62,6 @@
     settingsLogout: $("settings-logout"),
   };
 
-  // --- Utils ---
   const uid = () =>
     "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -98,7 +95,6 @@
 
   const userById = (id) => state.data.users.find((u) => u.id === id);
 
-  // --- GitHub API ---
   async function ghFetch(url, opts = {}) {
     const res = await fetch(url, {
       ...opts,
@@ -154,7 +150,6 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    // Handle stale sha — refetch, reapply not trivially possible, so just refresh and retry once
     if (res.status === 409 || res.status === 422) {
       await loadRemote();
       body.sha = state.sha;
@@ -169,8 +164,8 @@
       const txt = await res.text();
       let hint = "";
       if (res.status === 401) hint = " — token is invalid or expired.";
-      else if (res.status === 403) hint = " — token is missing Contents: Write permission on this repo.";
-      else if (res.status === 404) hint = " — repo or branch not found (is this repo private with no access?).";
+      else if (res.status === 403) hint = " — token is missing Contents: Write permission on private-data-storage.";
+      else if (res.status === 404) hint = " — private-data-storage repo or branch not found (does the token have access?).";
       throw new Error(`Save failed (HTTP ${res.status})${hint}\n\n${txt.slice(0, 300)}`);
     }
     const json = await res.json();
@@ -179,7 +174,6 @@
     setSync("ok");
   }
 
-  // --- Setup flow ---
   function showSetup() {
     el.setup.classList.remove("hidden");
     el.main.classList.add("hidden");
@@ -211,7 +205,6 @@
     state.token = token;
     try {
       await loadRemote();
-      // If first run and chores.json was 404, create it now
       if (state.sha === null) {
         await saveRemote("init chores.json");
       }
@@ -222,11 +215,10 @@
       startPolling();
     } catch (err) {
       el.setupError.textContent =
-        "Could not connect. Check the token has Contents: Read & Write on this repo.";
+        "Could not connect. Check the token has Contents: Read & Write on private-data-storage.";
     }
   });
 
-  // --- Rendering ---
   function render() {
     renderScoreboard();
     renderList();
@@ -356,13 +348,11 @@
   }
   function escapeAttr(s) { return escapeHtml(s); }
 
-  // --- Chore actions ---
   async function toggleChore(id) {
     const c = state.data.chores.find((x) => x.id === id);
     if (!c) return;
     const wasDone = isChoreDone(c);
     if (wasDone) {
-      // Undo latest completion
       c.history = (c.history || []).filter(
         (h) => h.at !== c.lastCompletedAt
       );
@@ -463,7 +453,6 @@
     }
   });
 
-  // --- Tabs ---
   el.tabs.addEventListener("click", (e) => {
     const btn = e.target.closest(".tab");
     if (!btn) return;
@@ -474,7 +463,6 @@
     renderList();
   });
 
-  // --- Settings ---
   el.settingsBtn.addEventListener("click", () => {
     el.settingsMyName.value = state.data.users[0].name;
     el.settingsPartnerName.value = state.data.users[1].name;
@@ -519,7 +507,6 @@
     showSetup();
   });
 
-  // --- Polling for remote updates ---
   let pollTimer = null;
   function startPolling() {
     stopPolling();
@@ -543,7 +530,6 @@
     }
   });
 
-  // --- Boot ---
   (async function boot() {
     if (!state.token) {
       showSetup();
