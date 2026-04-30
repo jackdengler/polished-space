@@ -15,7 +15,9 @@
       <div class="card">
         <h1>Hey 👋</h1>
         <p class="muted">
-          Little chore tracker for the two of you, synced through GitHub.
+          Little chore tracker for the two of you. Your data lives in your
+          <strong>private</strong> <code>private-data-storage</code> repo —
+          this app code is public, but none of your chore data is.
           You'll need a <strong>Personal Access Token</strong> (PAT) the
           first time on each device.
         </p>
@@ -24,9 +26,10 @@
           <ol>
             <li>Go to <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
             <li>Resource owner: <code>jackdengler</code></li>
-            <li>Repository access: <em>Only select repositories</em> → <code>polished-space</code></li>
+            <li>Repository access: <em>Only select repositories</em> → <code>private-data-storage</code></li>
             <li>Permissions → Repository permissions → <strong>Contents: Read and write</strong></li>
-            <li>Generate, copy the token, paste below</li>
+            <li>Set a short expiry (e.g. 90 days) and generate</li>
+            <li>Copy the token, paste below — it only ever lives in this browser</li>
           </ol>
         </details>
 
