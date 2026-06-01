@@ -1,0 +1,31 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies / build output
+node_modules/
+dist/
+.cache/
+
+# Secrets & environment — never commit these
+.env
+.env.*
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+credentials.json
+.clasprc.json
+
+# Personal data — lives in the private repo, never commit here
+chores.json
+data.json
