@@ -455,14 +455,14 @@ async function saveRemote(message){
       continue;
     }
     if((res.status===403 || res.status>=500) && attempt<3){ await delay(backoff(attempt)); continue; }  // rate-limit / server → back off
-    setSync('err','Sync error');
     let hint="";
-    if(res.status===401) hint=" — token invalid or expired.";
-    else if(res.status===403) hint=" — rate-limited or missing Contents: Write permission.";
-    else if(res.status===404) hint=" — repo or branch not found.";
-    throw new Error(`Save failed (HTTP ${res.status})${hint}`);
+    if(res.status===401){ hint=" — token invalid or expired."; setSync('err','Token expired'); }
+    else if(res.status===403){ hint=" — rate-limited or missing Contents: Write permission."; setSync('err','No write access'); }
+    else if(res.status===404){ hint=" — repo or branch not found."; setSync('err','Not found'); }
+    else setSync('err','Sync error');
+    const e=new Error(`Save failed (HTTP ${res.status})${hint}`); e.status=res.status; throw e;
   }
-  setSync('err','Sync error'); throw new Error('Save failed after several retries');
+  setSync('err','Conflict'); const e=new Error('Save failed after several retries (conflict)'); e.status=409; throw e;
 }
 function scheduleSave(message){
   if(!sync.token) return;
@@ -475,7 +475,19 @@ async function flushSave(){
   if(!sync.token||!sync.dirty||sync.saving) return;
   sync.saving=true; sync.dirty=false;
   try{ await saveRemote(sync.lastMsg); sync.failed=false; }
-  catch(err){ sync.dirty=true; if(!sync.failed){ sync.failed=true; toast("Can't reach GitHub — will keep retrying"); } }
+  catch(err){
+    sync.dirty=true;
+    if(!sync.failed){
+      sync.failed=true;
+      const s=err&&err.status;
+      let m="Can't reach GitHub — will keep retrying";
+      if(s===401) m="Token expired — open ⚙ Settings, sign out and paste a new one";
+      else if(s===403) m="Token can't write to private-data-storage — it needs Contents: Read & write";
+      else if(s===404) m="Can't find private-data-storage or its main branch";
+      else if(s===409) m="Sync kept colliding — will keep retrying";
+      toast(m);
+    }
+  }
   finally{ sync.saving=false; if(sync.dirty){ clearTimeout(sync.saveTimer); sync.saveTimer=setTimeout(flushSave, sync.failed?5000:600); } }
 }
 function startPolling(){
