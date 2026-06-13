@@ -378,13 +378,13 @@ const REPO_NAME="private-data-storage";
 const DATA_PATH="chore-split.json";
 const BRANCH="main";
 const API_BASE=`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DATA_PATH}`;
-const POLL_INTERVAL_MS=30_000;
+const POLL_INTERVAL_MS=3_000;
 const SAVE_DEBOUNCE_MS=1000;
 const LS_TOKEN="ps.token";
 const LS_DATA="ps.data";   // local-first cache: full state persisted on every change
 
 const sync={ token:localStorage.getItem(LS_TOKEN)||"", sha:null, lastSync:0,
-             saveTimer:null, dirty:false, saving:false, failed:false, pending:false, lastMsg:"update chores", pollTimer:null };
+             saveTimer:null, dirty:false, saving:false, failed:false, pending:false, etag:null, lastMsg:"update chores", pollTimer:null };
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const backoff=a=>Math.min(8000, 700*Math.pow(2,a))+Math.floor(Math.random()*300);
 
@@ -433,16 +433,19 @@ function unionLog(a,b){
   [...a,...b].forEach(e=>{ const k=e.id+'|'+e.at+'|'+(e.by||''); if(!seen.has(k)){ seen.add(k); out.push(e); } });
   return out.sort((x,y)=> x.at<y.at?-1:1);
 }
-async function loadRemote(){
-  setSync('syncing','Syncing…');
+async function loadRemote(conditional=false){
+  if(!conditional) setSync('syncing','Syncing…');
+  const headers={};
+  if(conditional && sync.etag) headers['If-None-Match']=sync.etag;   // cheap revalidation
   let res;
-  try{ res=await ghFetch(`${API_BASE}?ref=${BRANCH}`); }
+  try{ res=await ghFetch(`${API_BASE}?ref=${BRANCH}`, {headers, cache:'no-store'}); }
   catch(netErr){ setSync(sync.pending?'pending':'err', sync.pending?'Saved offline':'Offline'); netErr.offline=true; throw netErr; }
-  if(res.status===404){ sync.sha=null; setSync('ok','Synced'); return; }
+  if(res.status===304){ setSync(sync.pending?'pending':'ok', sync.pending?'Saved offline':'Synced'); return; }   // unchanged — fast, doesn't count against rate limit
+  if(res.status===404){ sync.sha=null; sync.etag=null; setSync('ok','Synced'); return; }
   if(!res.ok){ const e=new Error(`GET ${res.status}`); e.status=res.status; setSync('err', res.status===401?'Token expired':'Sync error'); throw e; }
   const json=await res.json();
   applyRemote(JSON.parse(b64decode(json.content)));
-  sync.sha=json.sha; sync.lastSync=Date.now();
+  sync.sha=json.sha; sync.etag=res.headers.get('ETag')||null; sync.lastSync=Date.now();
   setSync(sync.pending?'pending':'ok', sync.pending?'Saved offline':'Synced');
 }
 async function saveRemote(message){
@@ -460,7 +463,7 @@ async function saveRemote(message){
     }
     if(res.ok){
       const json=await res.json();
-      sync.sha=json.content.sha; sync.lastSync=Date.now(); sync.pending=false; persistLocal(); setSync('ok','Synced'); return;
+      sync.sha=json.content.sha; sync.etag=null; sync.lastSync=Date.now(); sync.pending=false; persistLocal(); setSync('ok','Synced'); return;
     }
     if(res.status===409||res.status===422){
       // remote moved on: reload its sha, keep our plan edits + UNION the logs so no check is lost, retry
@@ -513,10 +516,10 @@ function startPolling(){
   stopPolling();
   sync.pollTimer=setInterval(async()=>{
     if(document.hidden||sync.saving) return;
-    if(sync.dirty||sync.pending){ flushSave(); return; }   // upload local changes before pulling
+    if(sync.dirty||sync.pending){ if(!sync.failed) flushSave(); return; }   // upload local changes first (failures self-retry)
     const ae=document.activeElement;
     if(ae&&ae.classList&&(ae.classList.contains('step-input')||ae.classList.contains('task-input'))) return;
-    try{ const prev=sync.sha; await loadRemote(); if(sync.sha!==prev){ renderAll(); persistLocal(); } }catch{}
+    try{ const prev=sync.sha; await loadRemote(true); if(sync.sha!==prev){ renderAll(); persistLocal(); } }catch{}
   },POLL_INTERVAL_MS);
 }
 function stopPolling(){ if(sync.pollTimer) clearInterval(sync.pollTimer); sync.pollTimer=null; }
@@ -791,7 +794,7 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
   if(sync.pending && !confirm('You have changes that haven’t uploaded yet. Sign out anyway and discard them?')) return;
   if(!confirm('Sign out and clear the token on this device?')) return;
   localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_DATA);
-  sync.token=""; sync.sha=null; sync.pending=false; sync.dirty=false; sync.failed=false; stopPolling();
+  sync.token=""; sync.sha=null; sync.etag=null; sync.pending=false; sync.dirty=false; sync.failed=false; stopPolling();
   settingsModal.classList.add('hidden'); showSetup();
 });
 
@@ -799,13 +802,13 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){ if(sync.dirty||sync.pending) flushSave(); return; }
   if(!sync.token||sync.saving) return;
   if(sync.dirty||sync.pending) flushSave();
-  else loadRemote().then(()=>{ renderAll(); persistLocal(); }).catch(()=>{});
+  else loadRemote(true).then(()=>{ renderAll(); persistLocal(); }).catch(()=>{});
 });
 // When the network comes back, push anything saved locally and pull the latest.
 window.addEventListener('online', ()=>{
   if(!sync.token) return;
   if(sync.pending||sync.dirty) flushSave();
-  else loadRemote().then(()=>{ renderAll(); persistLocal(); }).catch(()=>{});
+  else loadRemote(true).then(()=>{ renderAll(); persistLocal(); }).catch(()=>{});
 });
 
 /* ─────────────────────────  Boot  ───────────────────────── */
