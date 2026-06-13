@@ -12,7 +12,7 @@
   :root{
     --bg:#EEF0F2; --card:#FFFFFF; --ink:#1C2026; --muted:#6B7280; --line:#E2E5EA;
     --jack:#1F8A8A; --jordan:#E07B4F; --both:#7A6FF0; --done:#2E9E6B; --done-soft:#E3F3EB;
-    --err:#D64545;
+    --err:#D64545; --either:#3E8EDE;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,system-ui,sans-serif;width:100%;max-width:100%;overflow-x:hidden;overscroll-behavior-x:none;}
@@ -98,12 +98,13 @@
   .chev{transition:transform .2s ease;color:var(--muted);font-size:12px;margin-left:2px;}
   .task.open .chev{transform:rotate(90deg);}
 
-  .seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:11px;}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:11px;}
   .seg button{appearance:none;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:10px 4px;font-family:'Space Grotesk';font-weight:600;font-size:13.5px;color:var(--muted);cursor:pointer;min-height:42px;transition:all .15s ease;}
   .seg button:active{transform:scale(.97);}
   .seg button.on.jack{background:var(--jack);border-color:var(--jack);color:#fff;}
   .seg button.on.jordan{background:var(--jordan);border-color:var(--jordan);color:#fff;}
   .seg button.on.both{background:var(--both);border-color:var(--both);color:#fff;}
+  .seg button.on.either{background:var(--either);border-color:var(--either);color:#fff;}
 
   .steps{display:none;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);}
   .task.open .steps{display:block;}
@@ -147,6 +148,12 @@
   .who-pill.jordan{background:rgba(224,123,79,.16);color:var(--jordan);}
   .who-pill.both{background:rgba(122,111,240,.16);color:var(--both);}
   .who-pill .dot{width:7px;height:7px;}
+  .trow.dual-row{align-items:center;}
+  .dual{display:flex;gap:6px;flex:none;}
+  .pcheck{display:flex;align-items:center;gap:4px;border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:8px 11px;font-family:'Space Grotesk';font-weight:600;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;}
+  .pcheck:active{transform:scale(.96);}
+  .pcheck.on.jack{background:var(--jack);border-color:var(--jack);color:#fff;}
+  .pcheck.on.jordan{background:var(--jordan);border-color:var(--jordan);color:#fff;}
 
   .log-head{display:flex;align-items:center;gap:10px;margin:26px 2px 12px;}
   .log-head .sec-label{font-size:13px;}
@@ -258,7 +265,7 @@
     <header>
       <div class="eyebrow">Household Operations</div>
       <h1>The Chore Split</h1>
-      <div class="sub">Plan the split here — assign tasks, add or remove your own, and set each standard. Switch to <strong>Track</strong> to check things off as you clean; it logs who did what and syncs between your phones.</div>
+      <div class="sub">Plan the split here — assign each task to Jack, Jordan, <strong>Both</strong> (you each do it) or <strong>Either</strong> (only one of you has to). Open a task to set its standard or add your own. Switch to <strong>Track</strong> to check things off — it logs who did what and syncs between your phones.</div>
     </header>
     <div id="planList"></div>
     <div id="trackList" style="display:none"></div>
@@ -323,7 +330,7 @@ DATA.forEach(s=>s.tasks.forEach(t=>DEFAULT_TASKS.push({id:t.id, group:s.group, n
 
 const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const WHO={jack:'Jack',jordan:'Jordan',both:'Both'};
+const WHO={jack:'Jack',jordan:'Jordan',both:'Both',either:'Either'};
 const whoLabel=w=>WHO[w]||'—';
 
 /* ─────────────────────────  App state  ───────────────────────── */
@@ -376,7 +383,9 @@ const SAVE_DEBOUNCE_MS=1000;
 const LS_TOKEN="ps.token";
 
 const sync={ token:localStorage.getItem(LS_TOKEN)||"", sha:null, lastSync:0,
-             saveTimer:null, dirty:false, saving:false, lastMsg:"update chores", pollTimer:null };
+             saveTimer:null, dirty:false, saving:false, failed:false, lastMsg:"update chores", pollTimer:null };
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+const backoff=a=>Math.min(8000, 700*Math.pow(2,a))+Math.floor(Math.random()*300);
 
 const b64encode=str=>btoa(unescape(encodeURIComponent(str)));
 const b64decode=str=>decodeURIComponent(escape(atob(str.replace(/\s/g,""))));
@@ -421,32 +430,39 @@ async function loadRemote(){
 async function saveRemote(message){
   if(!sync.token) return;
   setSync('syncing','Saving…');
-  const body={ message:message||"update chores", content:b64encode(JSON.stringify(serializeState(),null,2)+"\n"), branch:BRANCH };
-  if(sync.sha) body.sha=sync.sha;
-  let res=await ghFetch(API_BASE,{ method:"PUT", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
-  if(res.status===409||res.status===422){
-    // remote moved on: keep our plan edits (last-write-wins) but UNION completion logs so no check is lost
-    const localTasks=STATE.tasks.map(t=>({...t, steps:t.steps.map(s=>({text:s.text}))}));
-    const localLog=LOG.slice();
-    await loadRemote();
-    STATE.tasks=localTasks; refreshNames();
-    LOG=unionLog(LOG, localLog);
-    renderAll();
-    body.sha=sync.sha;
-    body.content=b64encode(JSON.stringify(serializeState(),null,2)+"\n");
-    res=await ghFetch(API_BASE,{ method:"PUT", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
-  }
-  if(!res.ok){
+  for(let attempt=0; attempt<4; attempt++){
+    const body={ message:message||"update chores", content:b64encode(JSON.stringify(serializeState(),null,2)+"\n"), branch:BRANCH };
+    if(sync.sha) body.sha=sync.sha;
+    let res;
+    try{
+      res=await ghFetch(API_BASE,{ method:"PUT", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
+    }catch(netErr){
+      if(attempt<3){ await delay(backoff(attempt)); continue; }   // network blip → back off & retry
+      setSync('err','Offline'); throw netErr;
+    }
+    if(res.ok){
+      const json=await res.json();
+      sync.sha=json.content.sha; sync.lastSync=Date.now(); setSync('ok','Synced'); return;
+    }
+    if(res.status===409||res.status===422){
+      // remote moved on: reload its sha, keep our plan edits + UNION the logs so no check is lost, retry
+      const localTasks=STATE.tasks.map(t=>({...t, steps:t.steps.map(s=>({text:s.text}))}));
+      const localLog=LOG.slice();
+      try{ await loadRemote(); }catch{}
+      STATE.tasks=localTasks; refreshNames();
+      LOG=unionLog(LOG, localLog);
+      renderAll();
+      continue;
+    }
+    if((res.status===403 || res.status>=500) && attempt<3){ await delay(backoff(attempt)); continue; }  // rate-limit / server → back off
     setSync('err','Sync error');
     let hint="";
     if(res.status===401) hint=" — token invalid or expired.";
-    else if(res.status===403) hint=" — token missing Contents: Write on private-data-storage.";
+    else if(res.status===403) hint=" — rate-limited or missing Contents: Write permission.";
     else if(res.status===404) hint=" — repo or branch not found.";
     throw new Error(`Save failed (HTTP ${res.status})${hint}`);
   }
-  const json=await res.json();
-  sync.sha=json.content.sha; sync.lastSync=Date.now();
-  setSync('ok','Synced');
+  setSync('err','Sync error'); throw new Error('Save failed after several retries');
 }
 function scheduleSave(message){
   if(!sync.token) return;
@@ -458,10 +474,9 @@ function scheduleSave(message){
 async function flushSave(){
   if(!sync.token||!sync.dirty||sync.saving) return;
   sync.saving=true; sync.dirty=false;
-  const msg=sync.lastMsg;
-  try{ await saveRemote(msg); }
-  catch(err){ sync.dirty=true; toast("Sync failed — will retry"); }
-  finally{ sync.saving=false; if(sync.dirty){ clearTimeout(sync.saveTimer); sync.saveTimer=setTimeout(flushSave,600); } }
+  try{ await saveRemote(sync.lastMsg); sync.failed=false; }
+  catch(err){ sync.dirty=true; if(!sync.failed){ sync.failed=true; toast("Can't reach GitHub — will keep retrying"); } }
+  finally{ sync.saving=false; if(sync.dirty){ clearTimeout(sync.saveTimer); sync.saveTimer=setTimeout(flushSave, sync.failed?5000:600); } }
 }
 function startPolling(){
   stopPolling();
@@ -482,6 +497,8 @@ function dateFmtKey(key){ const [y,m,d]=key.split('-').map(Number); return new D
 function relDay(key){ const t=todayKey(); if(key===t) return 'Today'; if(key===dayKey(new Date(Date.now()-86400e3).toISOString())) return 'Yesterday'; return dateFmtKey(key); }
 function todayEntries(id){ const tk=todayKey(); return LOG.filter(e=>e.id===id && dayKey(e.at)===tk); }
 function isDoneToday(id){ return todayEntries(id).length>0; }
+function doneByToday(id,who){ return todayEntries(id).some(e=>e.by===who); }
+function isTaskDoneToday(t){ return t.assign==='both' ? (doneByToday(t.id,'jack') && doneByToday(t.id,'jordan')) : todayEntries(t.id).length>0; }
 
 /* ─────────────────────────  Plan tab  ───────────────────────── */
 const planList=document.getElementById('planList');
@@ -502,8 +519,9 @@ function taskCardHTML(t){
     </div>
     <div class="seg" data-id="${t.id}">
       <button data-who="jack" class="${on('jack').trim()}">Jack</button>
-      <button data-who="both" class="${on('both').trim()}">Both</button>
       <button data-who="jordan" class="${on('jordan').trim()}">Jordan</button>
+      <button data-who="both" class="${on('both').trim()}">Both</button>
+      <button data-who="either" class="${on('either').trim()}">Either</button>
     </div>
     <div class="steps">
       <div class="steps-label">The standard — done when:</div>
@@ -577,7 +595,7 @@ function addTaskTo(group){
 }
 
 /* ─────────────────────────  Plan balance beam  ───────────────────────── */
-function tallies(){ let j=0,o=0; STATE.tasks.forEach(t=>{ if(t.assign==='jack')j++; else if(t.assign==='jordan')o++; else if(t.assign==='both'){j+=.5;o+=.5;} }); return {j,o}; }
+function tallies(){ let j=0,o=0; STATE.tasks.forEach(t=>{ if(t.assign==='jack')j++; else if(t.assign==='jordan')o++; else if(t.assign==='both'){j++;o++;} else if(t.assign==='either'){j+=.5;o+=.5;} }); return {j,o}; }
 const fmt=n=>Number.isInteger(n)?n:n.toFixed(1);
 function updateBeam(){
   const {j,o}=tallies();
@@ -593,11 +611,17 @@ function updateBeam(){
 }
 
 /* ─────────────────────────  Track tab  ───────────────────────── */
-function toggleDone(id){
+function toggleSingle(id){
   if(!whoami){ toast('Tell us who you are first'); return; }
   const tk=todayKey();
-  if(isDoneToday(id)){ LOG=LOG.filter(e=>!(e.id===id && dayKey(e.at)===tk)); scheduleSave(`untrack: ${taskName(id)}`); }
+  if(todayEntries(id).length){ LOG=LOG.filter(e=>!(e.id===id && dayKey(e.at)===tk)); scheduleSave(`untrack: ${taskName(id)}`); }
   else { LOG.push({id, by:whoami, at:new Date().toISOString()}); scheduleSave(`done: ${taskName(id)} (${whoLabel(whoami)})`); }
+  renderTrack();
+}
+function togglePerson(id,who){
+  const tk=todayKey();
+  if(doneByToday(id,who)){ LOG=LOG.filter(e=>!(e.id===id && e.by===who && dayKey(e.at)===tk)); scheduleSave(`untrack: ${taskName(id)} (${whoLabel(who)})`); }
+  else { LOG.push({id, by:who, at:new Date().toISOString()}); scheduleSave(`done: ${taskName(id)} (${whoLabel(who)})`); }
   renderTrack();
 }
 function whoPill(w){ const dotCls=w==='jordan'?'o':w==='jack'?'j':''; const dotStyle=w==='both'?'background:var(--both)':''; return `<span class="who-pill ${w}"><span class="dot ${dotCls}" style="${dotStyle}"></span>${whoLabel(w)}</span>`; }
@@ -606,7 +630,7 @@ function renderTrack(){
   document.getElementById('trackDate').textContent=dateFmtKey(todayKey());
   const assigned=[];
   GROUPS.forEach(G=>STATE.tasks.filter(t=>t.group===G.group&&t.assign).forEach(t=>assigned.push({G,t})));
-  const doneCount=assigned.filter(x=>isDoneToday(x.t.id)).length;
+  const doneCount=assigned.filter(x=>isTaskDoneToday(x.t)).length;
   document.getElementById('trackProg').textContent = assigned.length? `${doneCount} of ${assigned.length} done today` : 'Nothing assigned yet';
   document.getElementById('trackFill').style.width=(assigned.length?doneCount/assigned.length*100:0)+'%';
 
@@ -621,9 +645,22 @@ function renderTrack(){
     let lastGroup=null;
     assigned.forEach(({G,t})=>{
       if(G.group!==lastGroup){ html+=`<div class="sec-head"><span class="sec-label">${esc(G.group)}</span><span class="sec-rule"></span><span class="sec-count">${esc(G.note)}</span></div>`; lastGroup=G.group; }
-      const e=todayEntries(t.id)[0], done=!!e;
-      const meta = done ? `${whoPill(e.by)}<span>· ${timeFmt(e.at)}</span>` : `<span>Assigned to</span>${whoPill(t.assign)}`;
-      html+=`<div class="trow ${done?'done':''}" data-track="${t.id}"><span class="tcheck">${CHECK_SVG}</span><div class="tbody"><div class="tname">${esc(t.name)}</div><div class="tmeta">${meta}</div></div></div>`;
+      if(t.assign==='both'){
+        const jE=todayEntries(t.id).find(e=>e.by==='jack'), oE=todayEntries(t.id).find(e=>e.by==='jordan');
+        const jd=!!jE, od=!!oE, done=jd&&od;
+        const parts=[]; if(jE) parts.push(`Jack ${timeFmt(jE.at)}`); if(oE) parts.push(`Jordan ${timeFmt(oE.at)}`);
+        const meta = parts.length ? parts.join(' · ') : 'You each do this one';
+        html+=`<div class="trow dual-row ${done?'done':''}"><span class="tcheck">${CHECK_SVG}</span><div class="tbody"><div class="tname">${esc(t.name)}</div><div class="tmeta">${meta}</div></div>
+          <div class="dual">
+            <button class="pcheck jack ${jd?'on':''}" data-track="${t.id}" data-person="jack">${jd?'✓ ':''}Jack</button>
+            <button class="pcheck jordan ${od?'on':''}" data-track="${t.id}" data-person="jordan">${od?'✓ ':''}Jordan</button>
+          </div></div>`;
+      } else {
+        const e=todayEntries(t.id)[0], done=!!e;
+        const label = t.assign==='either' ? `<span>Either of you</span>` : `<span>Assigned to</span>${whoPill(t.assign)}`;
+        const meta = done ? `${whoPill(e.by)}<span>· ${timeFmt(e.at)}</span>` : label;
+        html+=`<div class="trow ${done?'done':''}" data-track="${t.id}" data-single><span class="tcheck">${CHECK_SVG}</span><div class="tbody"><div class="tname">${esc(t.name)}</div><div class="tmeta">${meta}</div></div></div>`;
+      }
     });
   }
   // History grouped by day, newest first
@@ -642,8 +679,10 @@ function renderTrack(){
   trackList.innerHTML=html;
 }
 trackList.addEventListener('click', e=>{
-  const row=e.target.closest('.trow');
-  if(row){ toggleDone(row.dataset.track); }
+  const pc=e.target.closest('button[data-person]');
+  if(pc){ togglePerson(pc.dataset.track, pc.dataset.person); return; }
+  const row=e.target.closest('.trow[data-single]');
+  if(row){ toggleSingle(row.dataset.track); }
 });
 
 /* ─────────────────────────  Render-all + tabs  ───────────────────────── */
