@@ -381,11 +381,27 @@ const API_BASE=`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents
 const POLL_INTERVAL_MS=30_000;
 const SAVE_DEBOUNCE_MS=1000;
 const LS_TOKEN="ps.token";
+const LS_DATA="ps.data";   // local-first cache: full state persisted on every change
 
 const sync={ token:localStorage.getItem(LS_TOKEN)||"", sha:null, lastSync:0,
-             saveTimer:null, dirty:false, saving:false, failed:false, lastMsg:"update chores", pollTimer:null };
+             saveTimer:null, dirty:false, saving:false, failed:false, pending:false, lastMsg:"update chores", pollTimer:null };
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const backoff=a=>Math.min(8000, 700*Math.pow(2,a))+Math.floor(Math.random()*300);
+
+// Local-first cache: the whole document is written to localStorage on every
+// change, so edits are durable offline and survive reloads. The next successful
+// save uploads everything in one commit ("bulk upload").
+function persistLocal(){
+  try{ localStorage.setItem(LS_DATA, JSON.stringify({ state:serializeState(), sha:sync.sha, pending:sync.pending })); }catch{}
+}
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem(LS_DATA); if(!raw) return false;
+    const c=JSON.parse(raw);
+    if(c && c.state){ applyRemote(c.state); sync.sha=c.sha||null; sync.pending=!!c.pending; return true; }
+  }catch{}
+  return false;
+}
 
 const b64encode=str=>btoa(unescape(encodeURIComponent(str)));
 const b64decode=str=>decodeURIComponent(escape(atob(str.replace(/\s/g,""))));
@@ -419,13 +435,15 @@ function unionLog(a,b){
 }
 async function loadRemote(){
   setSync('syncing','Syncing…');
-  const res=await ghFetch(`${API_BASE}?ref=${BRANCH}`);
+  let res;
+  try{ res=await ghFetch(`${API_BASE}?ref=${BRANCH}`); }
+  catch(netErr){ setSync(sync.pending?'pending':'err', sync.pending?'Saved offline':'Offline'); netErr.offline=true; throw netErr; }
   if(res.status===404){ sync.sha=null; setSync('ok','Synced'); return; }
-  if(!res.ok) throw new Error(`GET ${res.status}`);
+  if(!res.ok){ const e=new Error(`GET ${res.status}`); e.status=res.status; setSync('err', res.status===401?'Token expired':'Sync error'); throw e; }
   const json=await res.json();
   applyRemote(JSON.parse(b64decode(json.content)));
   sync.sha=json.sha; sync.lastSync=Date.now();
-  setSync('ok','Synced');
+  setSync(sync.pending?'pending':'ok', sync.pending?'Saved offline':'Synced');
 }
 async function saveRemote(message){
   if(!sync.token) return;
@@ -438,11 +456,11 @@ async function saveRemote(message){
       res=await ghFetch(API_BASE,{ method:"PUT", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
     }catch(netErr){
       if(attempt<3){ await delay(backoff(attempt)); continue; }   // network blip → back off & retry
-      setSync('err','Offline'); throw netErr;
+      setSync('pending','Saved offline'); netErr.offline=true; throw netErr;
     }
     if(res.ok){
       const json=await res.json();
-      sync.sha=json.content.sha; sync.lastSync=Date.now(); setSync('ok','Synced'); return;
+      sync.sha=json.content.sha; sync.lastSync=Date.now(); sync.pending=false; persistLocal(); setSync('ok','Synced'); return;
     }
     if(res.status===409||res.status===422){
       // remote moved on: reload its sha, keep our plan edits + UNION the logs so no check is lost, retry
@@ -465,9 +483,10 @@ async function saveRemote(message){
   setSync('err','Conflict'); const e=new Error('Save failed after several retries (conflict)'); e.status=409; throw e;
 }
 function scheduleSave(message){
+  sync.pending=true; persistLocal();   // durable on this device right away — survives offline & reload
   if(!sync.token) return;
   sync.dirty=true; sync.lastMsg=message||sync.lastMsg;
-  setSync('pending','Saving…');
+  if(!sync.failed) setSync('pending','Saving…');
   clearTimeout(sync.saveTimer);
   sync.saveTimer=setTimeout(flushSave,SAVE_DEBOUNCE_MS);
 }
@@ -480,11 +499,11 @@ async function flushSave(){
     if(!sync.failed){
       sync.failed=true;
       const s=err&&err.status;
-      let m="Can't reach GitHub — will keep retrying";
-      if(s===401) m="Token expired — open ⚙ Settings, sign out and paste a new one";
-      else if(s===403) m="Token can't write to private-data-storage — it needs Contents: Read & write";
-      else if(s===404) m="Can't find private-data-storage or its main branch";
-      else if(s===409) m="Sync kept colliding — will keep retrying";
+      let m="Saved on this device — will upload when you're back online";
+      if(s===401) m="Saved here. Token expired — open ⚙ Settings, sign out and paste a new one to upload";
+      else if(s===403) m="Saved here. Token can't write to private-data-storage (needs Contents: Read & write)";
+      else if(s===404) m="Saved here. Can't find private-data-storage or its main branch";
+      else if(s===409) m="Saved here — sync kept colliding, will keep retrying";
       toast(m);
     }
   }
@@ -493,13 +512,27 @@ async function flushSave(){
 function startPolling(){
   stopPolling();
   sync.pollTimer=setInterval(async()=>{
-    if(document.hidden||sync.dirty||sync.saving) return;
+    if(document.hidden||sync.saving) return;
+    if(sync.dirty||sync.pending){ flushSave(); return; }   // upload local changes before pulling
     const ae=document.activeElement;
     if(ae&&ae.classList&&(ae.classList.contains('step-input')||ae.classList.contains('task-input'))) return;
-    try{ const prev=sync.sha; await loadRemote(); if(sync.sha!==prev) renderAll(); }catch{}
+    try{ const prev=sync.sha; await loadRemote(); if(sync.sha!==prev){ renderAll(); persistLocal(); } }catch{}
   },POLL_INTERVAL_MS);
 }
 function stopPolling(){ if(sync.pollTimer) clearInterval(sync.pollTimer); sync.pollTimer=null; }
+
+// Reconcile local (possibly offline-edited) state with remote, then upload if needed.
+async function syncNow(){
+  const localTasks=STATE.tasks.map(t=>({...t, steps:t.steps.map(s=>({text:s.text}))}));
+  const localLog=LOG.slice();
+  const hadPending=sync.pending;
+  await loadRemote();                       // STATE/LOG ← remote (unchanged if 404)
+  LOG=unionLog(LOG, localLog);              // never drop a completion from either side
+  if(hadPending) STATE.tasks=localTasks;    // keep our unsynced plan edits (last-write-wins)
+  refreshNames(); renderAll();
+  if(hadPending || sync.sha===null){ scheduleSave(sync.sha===null?'init chore-split.json':'sync local changes'); }
+  else { persistLocal(); }
+}
 
 /* ─────────────────────────  Date helpers  ───────────────────────── */
 function dayKey(iso){ const d=new Date(iso); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -737,13 +770,16 @@ document.getElementById('setupForm').addEventListener('submit', async e=>{
   err.textContent=""; btn.disabled=true; btn.textContent="Connecting…";
   sync.token=token;
   try{
-    await loadRemote();
-    if(sync.sha===null){ seedDefaults(); await saveRemote('init chore-split.json'); }
-    localStorage.setItem(LS_TOKEN,token);
+    await syncNow();
+    localStorage.setItem(LS_TOKEN,token); persistLocal();
     renderAll(); showApp(); startPolling();
   }catch(ex){
     sync.token="";
-    err.textContent="Couldn't connect. Check the token has Contents: Read & Write on private-data-storage.";
+    err.textContent = (ex && ex.status===401)
+      ? "That token is invalid or expired."
+      : (ex && ex.offline)
+        ? "Couldn't reach GitHub — check your connection and try again."
+        : "Couldn't connect. Check the token has Contents: Read & Write on private-data-storage.";
   }finally{ btn.disabled=false; btn.textContent="Save & sync"; }
 });
 
@@ -752,27 +788,39 @@ document.getElementById('whoamiPill').addEventListener('click', ()=>{ updateIdUI
 document.getElementById('settingsClose').addEventListener('click', ()=>settingsModal.classList.add('hidden'));
 settingsModal.addEventListener('click', e=>{ if(e.target===settingsModal) settingsModal.classList.add('hidden'); });
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  if(sync.pending && !confirm('You have changes that haven’t uploaded yet. Sign out anyway and discard them?')) return;
   if(!confirm('Sign out and clear the token on this device?')) return;
-  localStorage.removeItem(LS_TOKEN); sync.token=""; sync.sha=null; stopPolling();
+  localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_DATA);
+  sync.token=""; sync.sha=null; sync.pending=false; sync.dirty=false; sync.failed=false; stopPolling();
   settingsModal.classList.add('hidden'); showSetup();
 });
 
 document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden){ if(sync.dirty) flushSave(); return; }
-  if(sync.token && !sync.dirty && !sync.saving){ loadRemote().then(renderAll).catch(()=>{}); }
+  if(document.hidden){ if(sync.dirty||sync.pending) flushSave(); return; }
+  if(!sync.token||sync.saving) return;
+  if(sync.dirty||sync.pending) flushSave();
+  else loadRemote().then(()=>{ renderAll(); persistLocal(); }).catch(()=>{});
+});
+// When the network comes back, push anything saved locally and pull the latest.
+window.addEventListener('online', ()=>{
+  if(!sync.token) return;
+  if(sync.pending||sync.dirty) flushSave();
+  else loadRemote().then(()=>{ renderAll(); persistLocal(); }).catch(()=>{});
 });
 
 /* ─────────────────────────  Boot  ───────────────────────── */
 (async function boot(){
-  seedDefaults();          // immediate UI; replaced by remote if it exists
+  seedDefaults();              // baseline
+  loadLocal();                 // hydrate from this device's cache (instant, works offline)
   updateIdUI(); renderAll();
   if(!sync.token){ showSetup(); return; }
-  showApp();
-  try{
-    await loadRemote();
-    if(sync.sha===null){ seedDefaults(); try{ await saveRemote('init chore-split.json'); }catch{} }
-    renderAll(); startPolling();
-  }catch(err){ showSetup("Saved token didn't work. Please paste a new one."); }
+  showApp(); startPolling();
+  try{ await syncNow(); }
+  catch(err){
+    if(err && err.status===401){ showSetup("Your token expired — paste a new one to keep syncing."); }
+    // otherwise we're offline / GitHub unreachable: stay in the app on local data;
+    // polling + retry will upload once the connection (or a fixed token) is back.
+  }
 })();
 </script>
 </body>
