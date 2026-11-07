@@ -18,11 +18,13 @@ if (/src="\.\/assets|href="\.\/assets/.test(html)) throw new Error('an asset was
 
 // The host adds its own document skeleton, so keep only what goes inside it.
 const title = html.match(/<title>.*?<\/title>/)[0];
-const icon = html.match(/<link rel="icon"[^>]*>/)?.[0] ?? '';
 const styles = [...html.matchAll(/<style>[\s\S]*?<\/style>/g)].map((m) => m[0]).join('\n');
 const scripts = [...html.matchAll(/<script type="module">[\s\S]*?<\/script>/g)].map((m) => m[0]).join('\n');
-const out = `${title}\n<meta name="color-scheme" content="light dark">\n${icon}\n${styles}\n<div id="root"></div>\n${scripts}\n`;
+// The host supplies the tab icon, so the favicon <link> is left out.
+const out = `${title}\n<meta name="color-scheme" content="light dark">\n${styles}\n<div id="root"></div>\n${scripts}\n`;
 
 mkdirSync('artifact', { recursive: true });
+// Guard against a half-copied tag swallowing the stylesheet: the CSS must open right after the head bits.
+if (!/^<title>[^<]*<\/title>\n<meta[^>]*>\n<style>/.test(out)) throw new Error('unexpected markup before the stylesheet');
 writeFileSync('artifact/compensian-pm.html', out);
 console.log(`artifact/compensian-pm.html (${(out.length / 1024).toFixed(0)} KB)`);
