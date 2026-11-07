@@ -1,18 +1,24 @@
 import { useSyncExternalStore } from 'react';
 
-/** URL shape: #/c/<clientId>[/m/<meetingId> | /adhoc][?t=<taskId>] — so pages can be bookmarked. */
-export interface Route { clientId: string | null; boardId: string | null; taskId: string | null }
+/**
+ * URL shapes (bookmarkable):
+ *   #/c/<clientId>[/m/<meetingId> | /adhoc][?t=<taskId>]   a client page
+ *   #/week[/<monday YYYY-MM-DD>]                           the weekly calendar
+ */
+export interface Route { clientId: string | null; boardId: string | null; taskId: string | null; weekPage?: boolean; week?: string | null }
 
 function parse(hash: string): Route {
   const [path = '', query = ''] = hash.replace(/^#/, '').split('?');
   const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
   const taskId = new URLSearchParams(query).get('t');
+  if (parts[0] === 'week') return { clientId: null, boardId: null, taskId: null, weekPage: true, week: /^\d{4}-\d{2}-\d{2}$/.test(parts[1] ?? '') ? parts[1]! : null };
   if (parts[0] !== 'c' || !parts[1]) return { clientId: null, boardId: null, taskId: null };
   const boardId = parts[2] === 'adhoc' ? 'adhoc' : parts[2] === 'm' && parts[3] ? parts[3] : null;
   return { clientId: parts[1], boardId, taskId };
 }
 
 export function routeHref(r: Partial<Route>): string {
+  if (r.weekPage) return r.week ? `#/week/${r.week}` : '#/week';
   if (!r.clientId) return '#/';
   let h = `#/c/${encodeURIComponent(r.clientId)}`;
   if (r.boardId === 'adhoc') h += '/adhoc';

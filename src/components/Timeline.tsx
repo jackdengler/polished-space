@@ -1,10 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { dayNumber, formatShort, fromDayNumber, MONTH_SHORT, parseIso, todayIso } from '../model/dates';
+import { dayNumber, formatDue, fromDayNumber, MONTH_SHORT, parseIso, todayIso } from '../model/dates';
 import {
-  allTasks, boardProgress, isAfterPlannedThrough, isOverdue, isPastMeeting, memberById, sortedMeetings,
+  allTasks, boardProgress, isAfterPlannedThrough, isOverdue, isPastMeeting, meetingLabel, memberById, sortedMeetings,
 } from '../model/derive';
 import { formatFlex, formatFlexShort, flexEnd, flexStart, parseFlexDate } from '../model/flexDate';
-import { ADHOC, type Client, type Meeting } from '../model/schema';
+import { ADHOC, type Client } from '../model/schema';
 import { buildScale } from '../model/timelineScale';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
@@ -34,6 +34,7 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
       todayN,
       ...meetings.map((m) => dayNumber(flexEnd(m.date))),
       ...dots.map((t) => dayNumber(t.dueDate!)),
+      ...meetings.flatMap((m) => (m.kickoff ? [dayNumber(m.kickoff.date)] : [])),
       ...(client.plannedThrough ? [dayNumber(flexEnd(client.plannedThrough))] : []),
     ],
     SCALE,
@@ -128,11 +129,20 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
             const who = memberById(members, t.assigneeId);
             return (
               <button key={t.id} className={`tl-dot${isOverdue(t, today) ? ' overdue' : ''}`} style={{ left: scale.x(dayNumber(t.dueDate!)) }}
-                title={`Ad-hoc: ${t.title} · due ${formatShort(t.dueDate!, today)}${who ? ` · ${who.name}` : ''}`}
-                aria-label={`Ad-hoc task ${t.title}, due ${formatShort(t.dueDate!, today)}`}
+                title={`Ad-hoc: ${t.title} · due ${formatDue(t.dueDate!, today)}${who ? ` · ${who.name}` : ''}`}
+                aria-label={`Ad-hoc task ${t.title}, due ${formatDue(t.dueDate!, today)}`}
                 onClick={() => navigate({ clientId: client.id, boardId: ADHOC, taskId: t.id })} />
             );
           })}
+
+          {meetings.filter((m) => m.kickoff).map((m) => (
+            <button key={`k-${m.id}`} className={`tl-kickoff${m.kickoff!.done ? ' done' : ''}`} style={{ left: scale.x(dayNumber(m.kickoff!.date)) }}
+              title={`Kickoff for ${meetingLabel(m, today)} · ${formatDue(m.kickoff!.date, today)}${m.kickoff!.done ? ' (done)' : ''}`}
+              aria-label={`Kickoff for ${meetingLabel(m, today)}, ${formatDue(m.kickoff!.date, today)}`}
+              onClick={() => navigate({ clientId: client.id, boardId: m.id })}>
+              <Icon name="flag" size={12} />
+            </button>
+          ))}
 
           {meetings.length === 0 && <div className="tl-empty">No meetings yet — add the first one.</div>}
         </div>
@@ -141,11 +151,6 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
       <AddMeetingButton client={client} />
     </section>
   );
-}
-
-/** The meeting's title, or else what it covers (its deliverables). */
-function meetingLabel(m: Meeting): string {
-  return m.title || m.deliverables.map((d) => d.title).join(', ') || 'Meeting';
 }
 
 function AddMeetingButton({ client }: { client: Client }) {

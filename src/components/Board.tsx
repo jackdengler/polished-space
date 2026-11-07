@@ -12,7 +12,9 @@ import { Icon } from './Icon';
 import { AddInput, InlineEdit } from './InlineEdit';
 import { confirmDialog } from './Modal';
 import { Menu } from './Popover';
-import { TaskCard } from './TaskCard';
+import { Checkbox, TaskCard } from './TaskCard';
+import { DatePickButton } from './DatePickButton';
+import { formatDue, formatLong, todayIso } from '../model/dates';
 
 const reorder = (ids: string[], e: DragEndEvent): [number, number] | null => {
   if (!e.over || e.active.id === e.over.id) return null;
@@ -102,6 +104,20 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
             </>
           )}
         </div>
+        {meeting && (
+          <div className={`kickoff${meeting.kickoff?.done ? ' done' : ''}`}>
+            {meeting.kickoff && (
+              <Checkbox small checked={meeting.kickoff.done} label={meeting.kickoff.done ? 'Kickoff done. Undo' : 'Mark kickoff done'}
+                onToggle={() => useStore.getState().toggleKickoffDone(client.id, meeting.id)} />
+            )}
+            <DatePickButton id={`kickoff-${meeting.id}`} value={meeting.kickoff?.date ?? null} label="Kickoff date"
+              title={meeting.kickoff ? `Kickoff ${formatLong(meeting.kickoff.date)}: work on this meeting starts. Shows on the weekly calendar.` : 'When work on this meeting should start. Shows on the weekly calendar.'}
+              className={`meta-btn kickoff-btn${meeting.kickoff ? '' : ' empty'}`}
+              onChange={(d) => useStore.getState().setKickoff(client.id, meeting.id, d)}>
+              <Icon name="flag" size={13} /><span>{meeting.kickoff ? `Kickoff ${formatDue(meeting.kickoff.date, todayIso())}` : 'Set kickoff'}</span>
+            </DatePickButton>
+          </div>
+        )}
         <div className="board-progress">
           <span className="bar wide"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></span>
           <span>{p.done} of {p.total} done</span>

@@ -106,6 +106,9 @@ export interface Store {
   addMeeting(clientId: string, date: FlexDate, title: string): string;
   updateMeeting(clientId: string, meetingId: string, patch: { title?: string; date?: FlexDate }): void;
   deleteMeeting(clientId: string, meetingId: string): void;
+  /** Set or clear a meeting's kickoff date (keeps its done state when moving). */
+  setKickoff(clientId: string, meetingId: string, date: string | null): void;
+  toggleKickoffDone(clientId: string, meetingId: string): void;
 
   // Deliverables (on a meeting or the ad-hoc board)
   addDeliverable(clientId: string, boardId: BoardId, title: string): string;
@@ -114,9 +117,11 @@ export interface Store {
   moveDeliverable(clientId: string, boardId: BoardId, from: number, to: number): void;
 
   // Tasks
-  addTask(deliverableId: string, title: string): string;
+  addTask(deliverableId: string, title: string, extra?: Partial<Pick<Task, 'assigneeId' | 'dueDate'>>): string;
   updateTask(id: string, patch: Partial<Pick<Task, 'title' | 'assigneeId' | 'dueDate'>>): void;
   toggleTask(id: string): void;
+  /** Personal "key task" star for one team member. */
+  toggleKey(taskId: string, memberId: string): void;
   deleteTask(id: string): void;
   moveTask(deliverableId: string, from: number, to: number): void;
 
@@ -171,7 +176,10 @@ export const useStore = create<Store>()((set, get) => {
     deleteMember: (id) => mutate((ws) => {
       ws.teamMembers = ws.teamMembers.filter((m) => m.id !== id);
       for (const c of ws.clients) c.teamMemberIds = c.teamMemberIds.filter((x) => x !== id);
-      for (const { d } of allDeliverables(ws)) for (const t of d.tasks) if (t.assigneeId === id) { t.assigneeId = null; touch(t); }
+      for (const { d } of allDeliverables(ws)) for (const t of d.tasks) {
+        if (t.assigneeId === id) { t.assigneeId = null; touch(t); }
+        if (t.keyFor.includes(id)) t.keyFor = t.keyFor.filter((x) => x !== id);
+      }
     }),
 
     importClients: (clients, newMembers) => mutate((ws) => {
@@ -187,7 +195,10 @@ export const useStore = create<Store>()((set, get) => {
           c.teamMemberIds = [...new Set(c.teamMemberIds.map((x) => (x === fromId ? intoId : x)))];
         }
       }
-      for (const { d } of allDeliverables(ws)) for (const t of d.tasks) if (t.assigneeId === fromId) { t.assigneeId = intoId; touch(t); }
+      for (const { d } of allDeliverables(ws)) for (const t of d.tasks) {
+        if (t.assigneeId === fromId) { t.assigneeId = intoId; touch(t); }
+        if (t.keyFor.includes(fromId)) t.keyFor = [...new Set(t.keyFor.map((x) => (x === fromId ? intoId : x)))];
+      }
     }),
 
     addClient: (name) => {
@@ -215,7 +226,7 @@ export const useStore = create<Store>()((set, get) => {
       const id = newId();
       mutate((ws) => {
         const t = now();
-        findClient(ws, clientId).meetings.push({ id, createdAt: t, updatedAt: t, title: title.trim(), date, deliverables: [] });
+        findClient(ws, clientId).meetings.push({ id, createdAt: t, updatedAt: t, title: title.trim(), date, kickoff: null, deliverables: [] });
       });
       return id;
     },
@@ -230,6 +241,16 @@ export const useStore = create<Store>()((set, get) => {
       c.meetings = c.meetings.filter((m) => m.id !== meetingId);
     }),
 
+    setKickoff: (clientId, meetingId, date) => mutate((ws) => {
+      const m = findBoard(ws, clientId, meetingId) as Draft<Client['meetings'][number]>;
+      m.kickoff = date ? { date, done: m.kickoff?.done ?? false } : null;
+      touch(m);
+    }),
+    toggleKickoffDone: (clientId, meetingId) => mutate((ws) => {
+      const m = findBoard(ws, clientId, meetingId) as Draft<Client['meetings'][number]>;
+      if (m.kickoff) { m.kickoff.done = !m.kickoff.done; touch(m); }
+    }),
+
     addDeliverable: (clientId, boardId, title) => {
       const d = emptyDeliverable(title.trim());
       mutate((ws) => { findBoard(ws, clientId, boardId).deliverables.push(d); });
@@ -242,8 +263,8 @@ export const useStore = create<Store>()((set, get) => {
     }),
     moveDeliverable: (clientId, boardId, from, to) => mutate((ws) => { move(findBoard(ws, clientId, boardId).deliverables, from, to); }),
 
-    addTask: (deliverableId, title) => {
-      const task: Task = { ...stamp(), title: title.trim(), assigneeId: null, dueDate: null, done: false, subtasks: [] };
+    addTask: (deliverableId, title, extra = {}) => {
+      const task: Task = { ...stamp(), title: title.trim(), assigneeId: null, dueDate: null, done: false, subtasks: [], keyFor: [], ...extra };
       mutate((ws) => { findDeliverable(ws, deliverableId).d.tasks.push(task); });
       return task.id;
     },
@@ -255,6 +276,11 @@ export const useStore = create<Store>()((set, get) => {
       touch(task);
     }),
     toggleTask: (id) => mutate((ws) => { const { task } = findTask(ws, id); task.done = !task.done; touch(task); }),
+    toggleKey: (taskId, memberId) => mutate((ws) => {
+      const { task } = findTask(ws, taskId);
+      task.keyFor = task.keyFor.includes(memberId) ? task.keyFor.filter((x) => x !== memberId) : [...task.keyFor, memberId];
+      touch(task);
+    }),
     deleteTask: (id) => mutate((ws) => {
       const { d, task } = findTask(ws, id);
       d.tasks.splice(d.tasks.indexOf(task), 1);

@@ -84,3 +84,31 @@ export function TeamToggleList({ client }: { client: Client }) {
     </div>
   );
 }
+
+/** A searchable list of people; `suggest` floats likely matches to the top. */
+export function PeopleList({ members, onPick, placeholder = 'Search team…', suggest }: {
+  members: TeamMember[]; onPick: (m: TeamMember) => void; placeholder?: string; suggest?: (m: TeamMember) => boolean;
+}) {
+  const [q, setQ] = useState('');
+  const query = q.trim().toLowerCase();
+  const shown = members
+    .filter((m) => m.name.toLowerCase().includes(query))
+    .sort((a, b) => Number(suggest?.(b) ?? 0) - Number(suggest?.(a) ?? 0) || a.name.localeCompare(b.name));
+  return (
+    <div className="picker">
+      <div className="picker-search">
+        <Icon name="search" size={14} />
+        <input autoFocus value={q} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && shown[0]) onPick(shown[0]); }} />
+      </div>
+      <div className="picker-list">
+        {shown.map((m) => (
+          <button key={m.id} className="picker-row" onClick={() => onPick(m)}>
+            <Avatar member={m} size={20} /> <span className="grow">{m.name}</span>
+          </button>
+        ))}
+        {shown.length === 0 && <div className="picker-empty">{members.length ? 'No one matches.' : 'No team members yet.'}</div>}
+      </div>
+    </div>
+  );
+}

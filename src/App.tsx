@@ -5,6 +5,8 @@ import { ConfirmHost } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
 import { TeamSettings } from './components/TeamSettings';
 import { Welcome } from './components/Welcome';
+import { WeekPage } from './components/WeekPage';
+import { WhoAmIModal } from './components/WhoAmI';
 import { navigate, useRoute } from './router';
 import { useStore } from './store/store';
 import { flush, hasUnsavedChanges, overwriteWithMine, reloadFromDisk, usePersistence } from './storage/persistence';
@@ -63,10 +65,10 @@ export function App() {
 
   // Nothing selected (or the client was deleted) → open the first active client.
   useEffect(() => {
-    if (!adapter || client) return;
+    if (!adapter || client || route.weekPage) return;
     const first = [...clients].filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name))[0];
     if (first) navigate({ clientId: first.id }, { replace: true });
-  }, [adapter, client, clients]);
+  }, [adapter, client, clients, route.weekPage]);
 
   if (!adapter) return <Welcome />;
 
@@ -75,11 +77,14 @@ export function App() {
       <Sidebar route={route} />
       <main className="main">
         <Banners />
-        {client
+        {route.weekPage
+          ? <WeekPage week={route.week ?? null} />
+          : client
           ? <ClientPage key={client.id} client={client} route={route} />
           : <div className="empty-main"><p>No client selected.</p><p className="muted">Add a client with the + in the sidebar.</p></div>}
       </main>
       <TeamSettings />
+      <WhoAmIModal />
       <ConfirmHost />
     </div>
   );

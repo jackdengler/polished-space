@@ -57,6 +57,21 @@ export function formatLong(iso: string): string {
   return `${MONTH_SHORT[month - 1]} ${day}, ${year}`;
 }
 
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/** 0 = Sunday … 6 = Saturday. (1970-01-01, day 0, was a Thursday.) */
+export const dayOfWeek = (iso: string) => (((dayNumber(iso) + 4) % 7) + 7) % 7;
+export const weekdayShort = (iso: string) => WEEKDAY_SHORT[dayOfWeek(iso)]!;
+export const isWeekend = (iso: string) => dayOfWeek(iso) === 0 || dayOfWeek(iso) === 6;
+
+/** The Monday on or before this date. */
+export const mondayOf = (iso: string) => addDays(iso, -((dayOfWeek(iso) + 6) % 7));
+
+/** Due-date display: "Tue Oct 28" (adds the year when it differs from today's). */
+export function formatDue(iso: string, relativeTo: string = todayIso()): string {
+  return `${weekdayShort(iso)} ${formatShort(iso, relativeTo)}`;
+}
+
 /** "10/28/26" — the format people type. */
 export function formatNumeric(iso: string): string {
   const { year, month, day } = parseIso(iso);

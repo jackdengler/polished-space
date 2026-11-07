@@ -83,6 +83,35 @@ describe('mergeMember', () => {
   });
 });
 
+describe('key tasks and kickoffs', () => {
+  it('toggles a personal key star and follows merges', () => {
+    const a = s().addMember('Sam');
+    const b = s().addMember('Samantha Reyes');
+    s().addClient('Acme');
+    const d = s().ws.clients[0]!.adhoc.deliverables[0]!.id;
+    const t = s().addTask(d, 'Deck');
+    s().toggleKey(t, a);
+    expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.keyFor).toEqual([a]);
+    s().mergeMember(a, b);
+    expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.keyFor).toEqual([b]);
+    s().toggleKey(t, b);
+    expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.keyFor).toEqual([]);
+  });
+
+  it('sets, completes, moves and clears a kickoff', () => {
+    const c = s().addClient('Acme');
+    const m = s().addMeeting(c, parseFlexDate('12/1/26')!, 'Readout');
+    const kick = () => s().ws.clients[0]!.meetings[0]!.kickoff;
+    s().setKickoff(c, m, '2026-11-10');
+    expect(kick()).toEqual({ date: '2026-11-10', done: false });
+    s().toggleKickoffDone(c, m);
+    s().setKickoff(c, m, '2026-11-16');
+    expect(kick()).toEqual({ date: '2026-11-16', done: true });
+    s().setKickoff(c, m, null);
+    expect(kick()).toBeNull();
+  });
+});
+
 describe('demo data', () => {
   it('is a valid workspace', () => {
     const ws = makeDemoWorkspace('2026-11-07');

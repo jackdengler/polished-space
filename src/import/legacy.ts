@@ -92,6 +92,7 @@ export function convertLegacyClients(
         dueDate: isIso(due) ? due : null,
         done: o.complete === true,
         subtasks: [],
+        keyFor: [],
       };
     };
     const toDeliverables = (list: unknown[]): Deliverable[] =>
@@ -105,7 +106,7 @@ export function convertLegacyClients(
       // The old tool's "name" usually held the real meeting date ("9/2/25", "Fall 2026").
       const fromName = parseFlexDate(name);
       const date: FlexDate = fromName ?? { kind: 'exact', date: isIso(created) ? created : today };
-      return { ...rec(), title: fromName ? '' : name, date, deliverables: toDeliverables(arr(m.deliverables)) };
+      return { ...rec(), title: fromName ? '' : name, date, kickoff: null, deliverables: toDeliverables(arr(m.deliverables)) };
     });
 
 

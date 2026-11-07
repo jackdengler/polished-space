@@ -19,6 +19,10 @@ const PATHS = {
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
   alert: 'M12 9v4M12 17h.01M10.3 3.9L2.5 17.5A2 2 0 004.2 20.5h15.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   inbox: 'M4 13l2.5-7h11L20 13M4 13v5h16v-5M4 13h4.5l1 2h5l1-2H20',
+  star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z',
+  starFilled: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z',
+  unarchive: 'M4 7h16v-2H4v2zM5 7v12h14V7M12 17v-6M9.5 13.5L12 11l2.5 2.5',
+  week: 'M4 5h16v15H4zM4 9h16M9 9v11M14 9v11M8 3v4M16 3v4',
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -27,7 +31,7 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={name === 'more' || name === 'grip' ? 3 : 1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={PATHS[name]} />
+      <path d={PATHS[name]} fill={name === 'starFilled' ? 'currentColor' : 'none'} />
     </svg>
   );
 }

@@ -4,6 +4,7 @@ import type { TeamMember } from '../model/schema';
 import { useStore } from '../store/store';
 import { useUi } from '../ui';
 import { Avatar } from './Avatar';
+import { PeopleList } from './MemberPicker';
 import { Icon } from './Icon';
 import { AddInput, InlineEdit } from './InlineEdit';
 import { confirmDialog, Modal } from './Modal';
@@ -34,12 +35,9 @@ function ColorPicker({ member }: { member: TeamMember }) {
 function MergeButton({ member, others }: { member: TeamMember; others: TeamMember[] }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState('');
-  const shown = others.filter((m) => m.name.toLowerCase().includes(q.trim().toLowerCase()));
   // Suggest likely matches first: same first word (e.g. "Sam" → "Samantha Reyes").
   const first = member.name.split(/[\s.(]/)[0]!.toLowerCase();
   const likely = (m: TeamMember) => first.length >= 2 && m.name.toLowerCase().startsWith(first);
-  const sorted = [...shown].sort((a, b) => Number(likely(b)) - Number(likely(a)));
   const merge = async (into: TeamMember) => {
     setOpen(false);
     if (await confirmDialog({
@@ -52,20 +50,7 @@ function MergeButton({ member, others }: { member: TeamMember; others: TeamMembe
     <>
       <button ref={ref} className="btn btn-sm btn-ghost" onClick={() => setOpen(true)}>Merge into…</button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240} align="end">
-        <div className="picker">
-          <div className="picker-search">
-            <Icon name="search" size={14} />
-            <input autoFocus value={q} placeholder="Same person as…" aria-label="Merge into" onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <div className="picker-list">
-            {sorted.map((m) => (
-              <button key={m.id} className="picker-row" onClick={() => void merge(m)}>
-                <Avatar member={m} size={20} /> <span className="grow">{m.name}</span>
-              </button>
-            ))}
-            {sorted.length === 0 && <div className="picker-empty">No one matches.</div>}
-          </div>
-        </div>
+        <PeopleList members={others} onPick={(m) => void merge(m)} placeholder="Same person as…" suggest={likely} />
       </Popover>
     </>
   );

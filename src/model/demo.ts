@@ -43,6 +43,7 @@ export function makeDemoWorkspace(today: string = todayIso()): Workspace {
       assigneeId: assignees.length ? assignees[Math.floor(rnd() * assignees.length)]! : null,
       dueDate: dueDay,
       subtasks: subs.map((s, i) => ({ ...rec('sub'), title: s, done: done || (i === 0 && rnd() > 0.4) })),
+      keyFor: [],
     };
   }
 
@@ -98,7 +99,10 @@ export function makeDemoWorkspace(today: string = todayIso()): Workspace {
 
   function meeting(title: string, date: FlexDate, deliverables: string[], assignees: string[], progress: number): Meeting {
     const day = date.kind === 'exact' ? date.date : date.start;
-    return { ...rec('meeting'), title, date, deliverables: deliverables.map((d) => deliverable(d, assignees, day, progress)) };
+    // Upcoming meetings get a kickoff ~3 weeks before (when that's still ahead or this week).
+    const kickoffDay = addDays(day, -21);
+    const kickoff = date.kind === 'exact' && progress < 1 && kickoffDay >= addDays(today, -7) ? { date: kickoffDay, done: progress > 0.3 } : null;
+    return { ...rec('meeting'), title, date, kickoff, deliverables: deliverables.map((d) => deliverable(d, assignees, day, progress)) };
   }
 
   const pick = (...idx: number[]) => idx.map((i) => team[i]!.id);

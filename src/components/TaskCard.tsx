@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatLong, formatShort, todayIso } from '../model/dates';
+import { formatDue, formatLong, isWeekend, todayIso } from '../model/dates';
 import { isOverdue, memberById } from '../model/derive';
 import type { Client, Task } from '../model/schema';
 import { useStore } from '../store/store';
@@ -10,6 +10,9 @@ import { Icon } from './Icon';
 import { AddInput, InlineEdit } from './InlineEdit';
 import { MemberPicker } from './MemberPicker';
 import { Menu, Popover } from './Popover';
+import { DatePickButton } from './DatePickButton';
+import { useMe } from './WhoAmI';
+import { askWhoAmI } from '../ui';
 
 export function Checkbox({ checked, onToggle, label, small }: { checked: boolean; onToggle: () => void; label: string; small?: boolean }) {
   return (
@@ -39,36 +42,31 @@ function AssigneeButton({ task, client }: { task: Task; client: Client }) {
   );
 }
 
-function DueButton({ task }: { task: Task }) {
-  const input = useRef<HTMLInputElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const [fallback, setFallback] = useState(false);
+/** Due-date chip: weekday + date, red when overdue, amber ⚠ when due on a weekend. */
+export function DueButton({ task }: { task: Task }) {
   const today = todayIso();
   const overdue = isOverdue(task, today);
-  const setDue = (v: string) => useStore.getState().updateTask(task.id, { dueDate: v || null });
-  const open = () => {
-    try { input.current!.showPicker(); } catch { setFallback(true); } // some embedded pages block the native picker
-  };
+  const weekend = !task.done && !overdue && task.dueDate !== null && isWeekend(task.dueDate);
+  const tip = task.dueDate ? `Due ${formatLong(task.dueDate)}${overdue ? ' (overdue)' : weekend ? ' (on a weekend)' : ''}` : 'Set due date';
   return (
-    <span className="due-wrap">
-      <button ref={button} className={`meta-btn${task.dueDate ? '' : ' empty'}${overdue ? ' overdue' : ''}`} onClick={open}
-        aria-label={task.dueDate ? `Due ${formatLong(task.dueDate)}. Change` : 'Set due date'}
-        title={task.dueDate ? `Due ${formatLong(task.dueDate)}${overdue ? ' (overdue)' : ''}` : 'Set due date'}>
-        <Icon name="calendar" size={13} /><span>{task.dueDate ? formatShort(task.dueDate, today) : 'Due'}</span>
-      </button>
-      <input ref={input} type="date" className="hidden-date" tabIndex={-1} aria-hidden="true" value={task.dueDate ?? ''}
-        onChange={(e) => setDue(e.target.value)} />
-      <Popover anchor={button} open={fallback} onClose={() => setFallback(false)} width={220}>
-        <div className="form">
-          <label className="field-label" htmlFor={`due-${task.id}`}>Due date</label>
-          <input id={`due-${task.id}`} type="date" className="text-input" autoFocus value={task.dueDate ?? ''} onChange={(e) => setDue(e.target.value)} />
-          <div className="form-actions">
-            {task.dueDate && <button className="btn btn-sm" onClick={() => { setDue(''); setFallback(false); }}>Clear</button>}
-            <button className="btn btn-sm btn-primary" onClick={() => setFallback(false)}>Done</button>
-          </div>
-        </div>
-      </Popover>
-    </span>
+    <DatePickButton id={task.id} value={task.dueDate} label={task.dueDate ? `Due ${formatDue(task.dueDate, today)}. Change` : 'Set due date'} title={tip}
+      className={`meta-btn${task.dueDate ? '' : ' empty'}${overdue ? ' overdue' : ''}${weekend ? ' weekend' : ''}`}
+      onChange={(v) => useStore.getState().updateTask(task.id, { dueDate: v })}>
+      <Icon name={weekend ? 'alert' : 'calendar'} size={13} /><span>{task.dueDate ? formatDue(task.dueDate, today) : 'Due'}</span>
+    </DatePickButton>
+  );
+}
+
+/** ☆/★ toggle for the current person's key tasks. */
+export function KeyStar({ task, className = '' }: { task: Task; className?: string }) {
+  const me = useMe();
+  const on = !!me && task.keyFor.includes(me.id);
+  return (
+    <button className={`star-btn${on ? ' on' : ''} ${className}`} aria-pressed={on}
+      aria-label={on ? 'Unmark key task' : 'Mark as key task'} title={on ? 'Key task (only you see this)' : 'Mark as key task'}
+      onClick={(e) => { e.stopPropagation(); if (me) useStore.getState().toggleKey(task.id, me.id); else askWhoAmI(); }}>
+      <Icon name={on ? 'starFilled' : 'star'} size={14} />
+    </button>
   );
 }
 
@@ -95,7 +93,9 @@ export function TaskCard({ task, client, highlight }: { task: Task; client: Clie
   const [expanded, setExpanded] = useState(false);
   const [addingSub, setAddingSub] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const { toggleTask, updateTask, deleteTask } = useStore.getState();
+  const { toggleTask, updateTask, deleteTask, toggleKey } = useStore.getState();
+  const me = useMe();
+  const key = !!me && task.keyFor.includes(me.id);
   const overdue = isOverdue(task);
   const subsDone = task.subtasks.filter((s) => s.done).length;
 
@@ -106,13 +106,15 @@ export function TaskCard({ task, client, highlight }: { task: Task; client: Clie
   const { role: _role, tabIndex: _tab, ...a11y } = attributes; // the card itself isn't a button
   return (
     <div ref={(el) => { setNodeRef(el); cardRef.current = el; }} {...a11y} {...listeners}
-      className={`task-card${task.done ? ' done' : ''}${overdue ? ' overdue' : ''}${highlight ? ' highlight' : ''}${isDragging ? ' dragging' : ''}`}
+      className={`task-card${key ? ' key' : ''}${task.done ? ' done' : ''}${overdue ? ' overdue' : ''}${highlight ? ' highlight' : ''}${isDragging ? ' dragging' : ''}`}
       style={{ transform: CSS.Translate.toString(transform), transition }} data-task-id={task.id}>
       <div className="task-top">
         <Checkbox checked={task.done} onToggle={() => toggleTask(task.id)} label={`Mark ${task.title} ${task.done ? 'not done' : 'done'}`} />
         <InlineEdit className="task-title" value={task.title} label="task" onCommit={(v) => updateTask(task.id, { title: v })} />
+        <KeyStar task={task} className="card-star" />
         <Menu className="icon-btn card-menu" button={<Icon name="more" size={15} />} label="Task actions" items={[
           { label: 'Add subtask', onSelect: () => { setExpanded(true); setAddingSub(true); } },
+          { label: key ? 'Unmark key task' : 'Mark as key task', onSelect: () => { if (me) toggleKey(task.id, me.id); else askWhoAmI(); } },
           { label: 'Delete task', danger: true, onSelect: () => deleteTask(task.id) },
         ]} />
       </div>

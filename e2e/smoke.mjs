@@ -17,6 +17,17 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 mkdirSync('test-results', { recursive: true });
 
+
+// Local-date helpers matching the app (ISO dates, Monday-start weeks).
+const pad = (n) => String(n).padStart(2, '0');
+const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const addDaysIso = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); return isoOf(new Date(y, m - 1, d + n)); };
+const todayLocal = isoOf(new Date());
+const mondayIso = (() => { const d = new Date(); const back = (d.getDay() + 6) % 7; return isoOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - back)); })();
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const longIso = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${MON[m - 1]} ${d}, ${y}`; };
+const saturdayIso = addDaysIso(mondayIso, 12); // a Saturday in the future
+
 let failed = false;
 const step = async (name, fn) => {
   try { await fn(); console.log(`  ✓ ${name}`); }
@@ -165,6 +176,85 @@ try {
     await page.locator('.tl-tile', { hasText: 'Fall 2026' }).waitFor();
     await page.locator('.tl-adhoc').click();
     await expectText(page.locator('.task-card'), 'Send invoice');
+  });
+
+  await step('archives and unarchives from the sidebar', async () => {
+    const item = page.locator('.client-item', { hasText: 'Bluebird Logistics' });
+    await item.hover();
+    await item.getByRole('button', { name: 'Archive Bluebird Logistics' }).click();
+    await expectText(page.locator('.archived-toggle'), 'Archived (3)');
+    await page.locator('.archived-toggle').click();
+    const archived = page.locator('.archived .client-item', { hasText: 'Bluebird Logistics' });
+    await archived.hover();
+    await archived.getByRole('button', { name: 'Unarchive Bluebird Logistics' }).click();
+    await expectText(page.locator('.archived-toggle'), 'Archived (2)');
+  });
+
+  await step('due dates show the weekday and flag weekends', async () => {
+    await page.locator('.client-item', { hasText: 'Northwind Health' }).locator('.client-link').click();
+    await page.locator('.tl-adhoc').click();
+    const card = page.locator('.task-card', { hasText: 'Request 2026 org chart' });
+    await card.locator('input[type=date]').fill(saturdayIso);
+    await expectText(card.locator('.meta-btn.weekend'), 'Sat');
+  });
+
+  await step('weekly calendar: pick me, add, check off, drag, push to next week', async () => {
+    await page.locator('.week-link').click();
+    await page.getByPlaceholder('Find yourself…').fill('Alex');
+    await page.keyboard.press('Enter');
+    await page.locator('.week-grid').waitFor();
+    const d1 = mondayIso, d2 = addDaysIso(mondayIso, 1);
+    const cell = (iso) => page.locator('.wg-cell', { has: page.getByRole('button', { name: `Add task on ${longIso(iso)} for me` }) });
+    await cell(d1).hover();
+    await page.getByRole('button', { name: `Add task on ${longIso(d1)} for me` }).click();
+    await page.getByPlaceholder('What needs doing?').fill('E2E week task');
+    await page.screenshot({ path: 'test-results/dbg-before-add.png' });
+    await page.getByRole('button', { name: 'Add task', exact: true }).click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: 'test-results/dbg-after-add.png' });
+    const chip = () => page.locator('.chip', { hasText: 'E2E week task' });
+    await cell(d1).locator('.chip', { hasText: 'E2E week task' }).waitFor();
+    await chip().getByRole('checkbox').click();
+    await page.locator('.chip.done', { hasText: 'E2E week task' }).waitFor();
+    await chip().getByRole('checkbox').click();
+
+    const drag = async (from, to) => {
+      const a = await from.boundingBox(), b = await to.boundingBox();
+      await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 4, { steps: 3 });
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForTimeout(120); // dnd-kit ignores clicks for 50ms after a drop
+    };
+    await drag(chip().locator('.chip-name'), cell(d2));
+    await cell(d2).locator('.chip', { hasText: 'E2E week task' }).waitFor();
+    await drag(chip().locator('.chip-name'), page.locator('.wg-next'));
+    await chip().waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Next week' }).click();
+    await cell(addDaysIso(mondayIso, 7)).locator('.chip', { hasText: 'E2E week task' }).waitFor();
+    await page.screenshot({ path: 'test-results/week-next.png' });
+  });
+
+  await step('key task from the hover card turns gold on the calendar and the client page', async () => {
+    const chip = page.locator('.chip', { hasText: 'E2E week task' });
+    await chip.hover();
+    await page.locator('.hover-card').getByRole('button', { name: 'Mark as key task' }).click();
+    await page.locator('.chip.key', { hasText: 'E2E week task' }).waitFor();
+    await page.mouse.move(5, 5);
+    await chip.click();
+    await page.locator('.task-card.key', { hasText: 'E2E week task' }).waitFor();
+  });
+
+  await step('kickoff date flows to the calendar and the timeline', async () => {
+    await page.locator('.client-item', { hasText: 'Northwind Health' }).locator('.client-link').click();
+    await page.locator('.tl-tile', { hasText: 'Leadership readout' }).click();
+    const kickDay = addDaysIso(mondayIso, 2);
+    await page.locator('.kickoff input[type=date]').fill(kickDay);
+    await page.locator('.tl-kickoff').first().waitFor();
+    await page.locator('.week-link').click();
+    await page.locator('.wg-cell .chip.kickoff', { hasText: 'Leadership readout' }).waitFor();
+    await page.screenshot({ path: 'test-results/week.png' });
   });
 
   await step('demo client page screenshot', async () => {

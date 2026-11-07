@@ -8,6 +8,8 @@ import { Icon } from './Icon';
 import { AddInput } from './InlineEdit';
 import { ImportClients } from './ImportClients';
 import { SaveStatus } from './SaveStatus';
+import { useMe } from './WhoAmI';
+import { addDays, dayNumber, mondayOf, todayIso } from '../model/dates';
 import type { Client } from '../model/schema';
 
 export function Sidebar({ route }: { route: Route }) {
@@ -18,16 +20,23 @@ export function Sidebar({ route }: { route: Route }) {
   const [adding, setAdding] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
+  const me = useMe();
+  const myOpen = me ? countMyOpen(clients, me.id) : 0;
   const byName = (a: Client, b: Client) => a.name.localeCompare(b.name);
   const active = clients.filter((c) => !c.archived).sort(byName);
   const archived = clients.filter((c) => c.archived).sort(byName);
 
   const item = (c: Client) => (
-    <a key={c.id} href={`#/c/${c.id}`} className={`client-item${route.clientId === c.id ? ' active' : ''}`}
-      onClick={(e) => { e.preventDefault(); navigate({ clientId: c.id }); }}>
-      <ClientLogo client={c} size={24} />
-      <span className="client-item-name">{c.name}</span>
-    </a>
+    <div key={c.id} className={`client-item${route.clientId === c.id ? ' active' : ''}`}>
+      <a href={`#/c/${c.id}`} className="client-link" onClick={(e) => { e.preventDefault(); navigate({ clientId: c.id }); }}>
+        <ClientLogo client={c} size={24} />
+        <span className="client-item-name">{c.name}</span>
+      </a>
+      <button className="icon-btn tiny archive-btn" title={c.archived ? 'Unarchive' : 'Archive'} aria-label={`${c.archived ? 'Unarchive' : 'Archive'} ${c.name}`}
+        onClick={() => useStore.getState().setArchived(c.id, !c.archived)}>
+        <Icon name={c.archived ? 'unarchive' : 'archive'} size={13} />
+      </button>
+    </div>
   );
 
   return (
@@ -40,6 +49,12 @@ export function Sidebar({ route }: { route: Route }) {
       </div>
 
       <nav className="client-list" aria-label="Clients">
+        <a href="#/week" className={`client-item week-link${route.weekPage ? ' active' : ''}`}
+          onClick={(e) => { e.preventDefault(); navigate({ weekPage: true }); }}>
+          <span className="week-icon"><Icon name="week" size={15} /></span>
+          <span className="client-item-name">This week</span>
+          {myOpen > 0 && <span className="badge" title="Your open tasks due this week or overdue">{myOpen}</span>}
+        </a>
         <div className="section-label">
           <span>Clients</span>
           <button className="icon-btn" aria-label="New client" title="New client" onClick={() => setAdding(true)}><Icon name="plus" size={15} /></button>
@@ -75,4 +90,17 @@ export function Sidebar({ route }: { route: Route }) {
       </div>
     </aside>
   );
+}
+
+/** My open tasks (and kickoffs at my clients) due by the end of this week, including overdue. */
+function countMyOpen(clients: Client[], meId: string): number {
+  const end = dayNumber(addDays(mondayOf(todayIso()), 6));
+  let n = 0;
+  for (const c of clients) {
+    if (c.archived) continue;
+    for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const t of d.tasks)
+      if (!t.done && t.assigneeId === meId && t.dueDate && dayNumber(t.dueDate) <= end) n++;
+    if (c.teamMemberIds.includes(meId)) for (const m of c.meetings) if (m.kickoff && !m.kickoff.done && dayNumber(m.kickoff.date) <= end) n++;
+  }
+  return n;
 }

@@ -26,6 +26,8 @@ export const TaskSchema = z.object({
   dueDate: IsoDate.nullable(),
   done: z.boolean(),
   subtasks: z.array(SubtaskSchema),
+  /** Team members who marked this as one of their key tasks (personal gold highlight). */
+  keyFor: z.array(z.string()).default([]),
 });
 
 export const DeliverableSchema = z.object({
@@ -38,6 +40,8 @@ export const MeetingSchema = z.object({
   ...record,
   title: z.string(),
   date: FlexDateSchema,
+  /** When work on this meeting should start; shows on the weekly calendar like a task. */
+  kickoff: z.object({ date: IsoDate, done: z.boolean() }).nullable().default(null),
   deliverables: z.array(DeliverableSchema),
 });
 

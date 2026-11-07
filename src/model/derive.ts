@@ -1,5 +1,5 @@
 import { dayNumber, todayIso } from './dates';
-import { compareFlex, flexEnd, flexStart } from './flexDate';
+import { compareFlex, flexEnd, flexStart, formatFlexShort } from './flexDate';
 import type { Client, Deliverable, Meeting, Task, TeamMember } from './schema';
 
 export interface Progress { done: number; total: number }
@@ -32,6 +32,11 @@ export const isAfterPlannedThrough = (m: Meeting, c: Client) =>
 export function defaultMeeting(c: Client, today = todayIso()): Meeting | null {
   const list = sortedMeetings(c);
   return list.find((m) => !isPastMeeting(m, today)) ?? list[list.length - 1] ?? null;
+}
+
+/** The meeting's title, or else what it covers (its deliverables). */
+export function meetingLabel(m: Meeting, today?: string): string {
+  return m.title || m.deliverables.map((d) => d.title).join(', ') || `Meeting ${formatFlexShort(m.date, today)}`;
 }
 
 export function initials(name: string): string {
