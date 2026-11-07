@@ -8,13 +8,13 @@ export type Theme = 'system' | 'light' | 'dark';
 export type SidebarSort = 'name' | 'meeting';
 interface Prefs {
   meId: string | null; showWeekend: boolean; hideDone: boolean; theme: Theme;
-  sidebarSort: SidebarSort; hideDoneTasks: boolean; lastBackupAt: string | null;
+  sidebarSort: SidebarSort; hideDoneTasks: boolean; lastBackupAt: string | null; monthOnlyMine: boolean;
 }
 
 const KEY = 'compensian-pm-prefs';
 
 function load(): Prefs {
-  const base: Prefs = { meId: null, showWeekend: false, hideDone: false, theme: 'system', sidebarSort: 'name', hideDoneTasks: false, lastBackupAt: null };
+  const base: Prefs = { meId: null, showWeekend: false, hideDone: false, theme: 'system', sidebarSort: 'name', hideDoneTasks: false, lastBackupAt: null, monthOnlyMine: false };
   try { return { ...base, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return base; }
 }
 

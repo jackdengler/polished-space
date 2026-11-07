@@ -16,9 +16,13 @@ From the user's checklist of the old app (branch `cleanup/single-user-refresh`).
   - Two-step delete (click → trash for 2s → click again) for small things: tasks, subtasks, empty deliverables
   - Confirm pop-up for big ones: client, meeting, deliverable with tasks, person
 
+## Done next
+- [x] Monthly calendar (weekdays only, drag between days, Hide done shared with the week, Only my tasks)
+- [x] Due dates: type (with snapping, weekdays, today/tomorrow) or pick from a calendar
+- [x] Multiple people per task; auto-matched names pick up roles
+
 ## Next
-- Monthly calendar (weekdays only, drag between days, Show completed, Only my tasks)
-- Then time tracking (to discuss: timer, OpenAir tasks, timesheet, day timeline)
+- Time tracking (to discuss: timer, OpenAir tasks, timesheet, day timeline)
 
 ## Later / eventually
 - PTO + coverage

@@ -255,6 +255,32 @@ try {
     await page.locator('.task-card.key', { hasText: 'E2E week task' }).waitFor();
   });
 
+  await step('month calendar: tasks on their days, drag to reschedule, only mine', async () => {
+    await page.locator('.nav-link-row', { hasText: 'Month' }).click();
+    await page.locator('.month-grid').waitFor();
+    const nextMon = addDaysIso(mondayIso, 7);
+    if (nextMon.slice(0, 7) !== todayLocal.slice(0, 7)) await page.getByRole('button', { name: 'Next month' }).click();
+    const cell = (iso) => page.locator('.mg-cell').filter({ has: page.locator('.chip', { hasText: 'E2E week task' }) });
+    await cell().first().waitFor();
+    // Drag it two days later.
+    const target = addDaysIso(nextMon, 2);
+    const cells = await page.locator('.mg-cell').all();
+    let targetCell = null;
+    for (const c of cells) { const box = c; if ((await box.locator('.mg-date').textContent()).trim().endsWith(String(Number(target.slice(8))))) { targetCell = box; } }
+    const chip = page.locator('.chip-wrap', { hasText: 'E2E week task' });
+    const a = await chip.boundingBox(), b = await targetCell.boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 4, { steps: 3 });
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 }); await page.mouse.up();
+    await page.waitForTimeout(150);
+    await targetCell.locator('.chip', { hasText: 'E2E week task' }).waitFor();
+    const before = await page.locator('.mg-cell .chip').count();
+    await page.getByLabel('Only my tasks').check();
+    const after = await page.locator('.mg-cell .chip').count();
+    if (!(after <= before)) throw new Error(`only mine: ${before} → ${after}`);
+    await page.getByLabel('Only my tasks').uncheck();
+  });
+
   await step('kickoff date flows to the calendar and the timeline', async () => {
     await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
     await page.locator('.tl-tile', { hasText: 'Leadership readout' }).click();

@@ -10,6 +10,7 @@ import { Welcome } from './components/Welcome';
 import { TopBar } from './components/TopBar';
 import { WeekPage } from './components/WeekPage';
 import { StaffingPage } from './components/StaffingPage';
+import { MonthPage } from './components/MonthPage';
 import { WhoAmIModal } from './components/WhoAmI';
 import { navigate, useRoute } from './router';
 import { useStore } from './store/store';
@@ -86,9 +87,9 @@ export function App() {
 
   // Nothing selected (or the client was deleted) → start on This week.
   useEffect(() => {
-    if (!adapter || client || route.weekPage || route.staffingPage) return;
+    if (!adapter || client || route.weekPage || route.staffingPage || route.monthPage) return;
     navigate({ weekPage: true }, { replace: true });
-  }, [adapter, client, route.weekPage, route.staffingPage]);
+  }, [adapter, client, route.weekPage, route.staffingPage, route.monthPage]);
 
   if (!adapter) return <Welcome />;
 
@@ -102,6 +103,8 @@ export function App() {
         <Banners />
         {route.staffingPage
           ? <StaffingPage />
+          : route.monthPage
+          ? <MonthPage month={route.month ?? null} />
           : route.weekPage
           ? <WeekPage week={route.week ?? null} />
           : client
