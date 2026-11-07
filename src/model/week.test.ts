@@ -95,6 +95,20 @@ describe('buildWeek', () => {
   });
 });
 
+describe('clientDueStatus', () => {
+  const today = '2026-11-07'; // Saturday; this week ends Sun Nov 8, next week ends Sun Nov 15
+  const c = (dates: (string | null)[], done = false) => client('X', [], dates.map((d, i) => task(`t${i}`, null, d, done)));
+  it('picks the most urgent open work', async () => {
+    const { clientDueStatus } = await import('./derive');
+    expect(clientDueStatus(c(['2026-11-15', '2026-11-08', '2026-11-06']), today)!.status).toBe('overdue');
+    expect(clientDueStatus(c(['2026-11-15', '2026-11-08']), today)!.status).toBe('thisWeek');
+    expect(clientDueStatus(c(['2026-11-15', '2026-11-20']), today)!.status).toBe('nextWeek');
+    expect(clientDueStatus(c(['2026-11-20', null]), today)).toBeNull();
+    expect(clientDueStatus(c(['2026-11-06'], true), today)).toBeNull(); // done tasks don't count
+    expect(clientDueStatus(c(['2026-11-06', '2026-11-08', '2026-11-09']), today)!.counts).toEqual({ overdue: 1, thisWeek: 1, nextWeek: 1 });
+  });
+});
+
 describe('schema defaults', () => {
   it('loads files saved before key tasks and kickoffs existed', () => {
     const old = {

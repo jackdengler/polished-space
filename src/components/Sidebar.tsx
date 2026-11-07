@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { addDays, dayNumber, mondayOf, todayIso } from '../model/dates';
 import type { Client } from '../model/schema';
-import { isOverdue } from '../model/derive';
+import { clientDueStatus } from '../model/derive';
 import { setPrefs, usePrefs, type Theme } from '../prefs';
 import { navigate, type Route } from '../router';
 import { useStore } from '../store/store';
@@ -25,18 +25,13 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
   const archived = clients.filter((c) => c.archived).sort(byName);
   const go = (r: Partial<Route>) => { navigate(r); onNavigate?.(); };
   const today = todayIso();
-  const overdue = (c: Client) => {
-    let n = 0;
-    for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const t of d.tasks) if (isOverdue(t, today)) n++;
-    return n;
-  };
 
   const item = (c: Client) => (
     <div key={c.id} className={`nav-item${route.clientId === c.id ? ' active' : ''}`}>
       <a href={`#/c/${c.id}`} className="nav-link" onClick={(e) => { e.preventDefault(); go({ clientId: c.id }); }}>
         <span className="logo-tile"><ClientLogo client={c} size={18} /></span>
         <span className="nav-name">{c.name}</span>
-        {!c.archived && overdue(c) > 0 && <span className="nav-dot" title={`${overdue(c)} overdue`} aria-label={`${overdue(c)} overdue`} />}
+        <DueDot client={c} today={today} />
       </a>
       <button className="icon-btn tiny archive-btn" title={c.archived ? 'Unarchive' : 'Archive'} aria-label={`${c.archived ? 'Unarchive' : 'Archive'} ${c.name}`}
         onClick={() => useStore.getState().setArchived(c.id, !c.archived)}>
@@ -139,4 +134,14 @@ function countMyOpen(clients: Client[], meId: string): number {
     if (c.teamMemberIds.includes(meId)) for (const m of c.meetings) if (m.kickoff && !m.kickoff.done && dayNumber(m.kickoff.date) <= end) n++;
   }
   return n;
+}
+
+/** Red: overdue tasks. Yellow: tasks due this week. Green: tasks due next week. */
+function DueDot({ client, today }: { client: Client; today: string }) {
+  if (client.archived) return null;
+  const due = clientDueStatus(client, today);
+  if (!due) return null;
+  const { overdue, thisWeek, nextWeek } = due.counts;
+  const parts = [overdue && `${overdue} overdue`, thisWeek && `${thisWeek} due this week`, nextWeek && `${nextWeek} due next week`].filter(Boolean).join(' · ');
+  return <span className={`nav-dot ${due.status}`} title={parts} aria-label={parts} />;
 }

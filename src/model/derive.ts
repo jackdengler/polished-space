@@ -1,4 +1,4 @@
-import { dayNumber, todayIso } from './dates';
+import { addDays, dayNumber, mondayOf, todayIso } from './dates';
 import { compareFlex, flexEnd, flexStart, formatFlexShort } from './flexDate';
 import type { Client, Deliverable, Meeting, Task, TeamMember } from './schema';
 
@@ -26,6 +26,28 @@ export const deliverablesComplete = (deliverables: Deliverable[]): Progress => (
 });
 
 export const isOverdue = (t: Task, today = todayIso()) => !t.done && t.dueDate !== null && dayNumber(t.dueDate) < dayNumber(today);
+
+export type DueStatus = 'overdue' | 'thisWeek' | 'nextWeek';
+
+/**
+ * A client's most urgent open work, for the sidebar dot:
+ * overdue (red) › due this week (yellow) › due next week (green). Weeks run Monday–Sunday.
+ */
+export function clientDueStatus(c: Client, today = todayIso()): { status: DueStatus; counts: Record<DueStatus, number> } | null {
+  const t = dayNumber(today);
+  const thisEnd = dayNumber(addDays(mondayOf(today), 6));
+  const nextEnd = thisEnd + 7;
+  const counts: Record<DueStatus, number> = { overdue: 0, thisWeek: 0, nextWeek: 0 };
+  for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const task of d.tasks) {
+    if (task.done || !task.dueDate) continue;
+    const n = dayNumber(task.dueDate);
+    if (n < t) counts.overdue++;
+    else if (n <= thisEnd) counts.thisWeek++;
+    else if (n <= nextEnd) counts.nextWeek++;
+  }
+  const status: DueStatus | null = counts.overdue ? 'overdue' : counts.thisWeek ? 'thisWeek' : counts.nextWeek ? 'nextWeek' : null;
+  return status ? { status, counts } : null;
+}
 
 export const allTasks = (deliverables: Deliverable[]) => deliverables.flatMap((d) => d.tasks);
 
