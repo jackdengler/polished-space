@@ -186,10 +186,10 @@ function NextWeekDrop({ label, col }: { label: string; col: number }) {
 function MeetingChip({ m }: { m: WeekMeeting }) {
   const today = todayIso();
   return (
-    <button className="meet-chip" title={`${m.client.name} · ${meetingLabel(m.meeting, today)}`}
-      onClick={() => navigate({ clientId: m.client.id, boardId: m.meeting.id })}>
+    <button className="meet-chip" title={`${m.client.name} meeting · ${meetingLabel(m.meeting, today)}`}
+      aria-label={`${m.client.name} meeting`} onClick={() => navigate({ clientId: m.client.id, boardId: m.meeting.id })}>
       <ClientLogo client={m.client} size={16} />
-      <span className="chip-name">{meetingLabel(m.meeting, today)}</span>
+      <span className="chip-name">{m.client.name}</span>
     </button>
   );
 }
