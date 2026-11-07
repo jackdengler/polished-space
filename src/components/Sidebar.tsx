@@ -6,6 +6,7 @@ import { openTeamSettings } from '../ui';
 import { ClientLogo } from './Avatar';
 import { Icon } from './Icon';
 import { AddInput } from './InlineEdit';
+import { ImportClients } from './ImportClients';
 import { SaveStatus } from './SaveStatus';
 import type { Client } from '../model/schema';
 
@@ -36,7 +37,7 @@ export function Sidebar({ route }: { route: Route }) {
       <div className="sidebar-top">
         <div className="brand">
           <span className="brand-mark"><Icon name="check" size={14} /></span>
-          <span className="brand-name" title={adapter?.name}>{adapter?.kind === 'memory' ? 'Demo workspace' : adapter?.name}</span>
+          <span className="brand-name" title={adapter?.name}>{adapter?.name}</span>
         </div>
         <div className="search">
           <Icon name="search" size={14} />
@@ -70,12 +71,13 @@ export function Sidebar({ route }: { route: Route }) {
 
       <div className="sidebar-bottom">
         <button className="side-btn" onClick={openTeamSettings}><Icon name="users" size={15} /> Team</button>
+        <ImportClients />
         <div className="side-row">
           <button className="icon-btn" disabled={!canUndo} onClick={() => useStore.getState().undo()} aria-label="Undo" title="Undo (Ctrl+Z)"><Icon name="undo" size={15} /></button>
           <button className="icon-btn" disabled={!canRedo} onClick={() => useStore.getState().redo()} aria-label="Redo" title="Redo (Ctrl+Shift+Z)"><Icon name="redo" size={15} /></button>
           <SaveStatus />
         </div>
-        <button className="side-btn muted" onClick={() => void closeWorkspace()}><Icon name="folder" size={15} /> {adapter?.kind === 'memory' ? 'Leave demo' : 'Switch folder'}</button>
+        <button className="side-btn muted" onClick={() => void closeWorkspace()}><Icon name="folder" size={15} /> {adapter?.kind === 'memory' ? 'Back to start' : 'Switch folder'}</button>
       </div>
     </aside>
   );

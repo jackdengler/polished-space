@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { produce, type Draft } from 'immer';
 import type { FlexDate } from '../model/flexDate';
-import { ADHOC, emptyWorkspace, type BoardId, type Client, type Deliverable, type Task, type Workspace } from '../model/schema';
+import { ADHOC, emptyWorkspace, type BoardId, type Client, type Deliverable, type Task, type TeamMember, type Workspace } from '../model/schema';
 import { MEMBER_COLORS } from '../model/derive';
 
 /**
@@ -90,6 +90,8 @@ export interface Store {
   deleteMember(id: string): void;
 
   // Clients
+  /** Add imported clients and any new team members in one step. */
+  importClients(clients: Client[], newMembers: TeamMember[]): void;
   addClient(name: string): string;
   renameClient(id: string, name: string): void;
   setClientLogo(id: string, logo: string | null): void;
@@ -168,6 +170,11 @@ export const useStore = create<Store>()((set, get) => {
       ws.teamMembers = ws.teamMembers.filter((m) => m.id !== id);
       for (const c of ws.clients) c.teamMemberIds = c.teamMemberIds.filter((x) => x !== id);
       for (const { d } of allDeliverables(ws)) for (const t of d.tasks) if (t.assigneeId === id) { t.assigneeId = null; touch(t); }
+    }),
+
+    importClients: (clients, newMembers) => mutate((ws) => {
+      ws.teamMembers.push(...newMembers);
+      ws.clients.push(...clients);
     }),
 
     addClient: (name) => {

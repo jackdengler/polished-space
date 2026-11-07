@@ -3,14 +3,15 @@ import { makeDemoWorkspace } from '../model/demo';
 import { emptyWorkspace, type Workspace } from '../model/schema';
 import { FolderAdapter } from '../storage/folderAdapter';
 import { forgetFolder, getSavedFolder, saveFolder } from '../storage/handleStore';
-import { clearSavedDemo, loadSavedDemo, MemoryAdapter } from '../storage/memoryAdapter';
+import { clearSavedBrowserWorkspace, loadSavedBrowserWorkspace, MemoryAdapter } from '../storage/memoryAdapter';
+import { confirmDialog, ConfirmHost } from './Modal';
 import { attach, flush } from '../storage/persistence';
 import { Icon } from './Icon';
 
 /** Embedded previews (e.g. a hosted page inside another site) can't open folders. */
 const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
 const supported = typeof window.showDirectoryPicker === 'function' && !embedded;
-const DEMO_KEY = 'compensian-pm-demo';
+const BROWSER_KEY = 'compensian-pm-demo';
 /** `?storage=opfs` uses the browser's private file system instead of a picked folder (for automated tests). */
 const testStorage = new URLSearchParams(location.search).get('storage') === 'opfs';
 
@@ -19,8 +20,18 @@ export function Welcome() {
   const [emptyFolder, setEmptyFolder] = useState<FolderAdapter | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [savedDemo, setSavedDemo] = useState(() => loadSavedDemo(DEMO_KEY));
-  const startDemo = (ws: Workspace) => attach(new MemoryAdapter(ws, DEMO_KEY), ws);
+  const [browserWs, setBrowserWs] = useState(() => loadSavedBrowserWorkspace(BROWSER_KEY));
+  const startInBrowser = (ws: Workspace) => {
+    const adapter = new MemoryAdapter(ws, BROWSER_KEY);
+    attach(adapter, ws);
+    void flush();
+  };
+  async function eraseBrowser() {
+    if (await confirmDialog({ title: 'Erase what this browser saved?', message: 'All clients and tasks kept in this browser will be deleted. This can’t be undone.', confirmLabel: 'Erase', danger: true })) {
+      clearSavedBrowserWorkspace(BROWSER_KEY);
+      setBrowserWs(null);
+    }
+  }
 
   useEffect(() => {
     if (testStorage) return;
@@ -96,13 +107,18 @@ export function Welcome() {
             <Icon name="folder" size={16} /> {testStorage ? 'Use test storage' : saved ? 'Open a different folder' : 'Open or create a workspace folder'}
           </button>
         )}
-        <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startDemo(savedDemo ?? makeDemoWorkspace())}>
-          {savedDemo ? 'Continue the demo' : 'Try the demo'}
-        </button>
+        {browserWs ? (
+          <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startInBrowser(browserWs)}>
+            Continue in this browser ({browserWs.clients.length} client{browserWs.clients.length === 1 ? '' : 's'})
+          </button>
+        ) : (
+          <>
+            <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startInBrowser(makeDemoWorkspace())}>Try the demo</button>
+            <button className="btn btn-lg" onClick={() => startInBrowser(emptyWorkspace())}>Start empty in this browser</button>
+          </>
+        )}
       </div>
-      {savedDemo && (
-        <button className="link small" onClick={() => { clearSavedDemo(DEMO_KEY); setSavedDemo(null); }}>Reset the demo to fresh sample data</button>
-      )}
+      {browserWs && <button className="link small" onClick={() => void eraseBrowser()}>Erase what this browser saved…</button>}
       {saved && <button className="link small" onClick={() => { void forgetFolder(); setSaved(null); }}>Forget “{saved.name}”</button>}
       {error && <p className="welcome-error" role="alert"><Icon name="alert" size={14} /> {error}</p>}
       {!supported && !testStorage && (
@@ -114,8 +130,9 @@ export function Welcome() {
       )}
       <p className="welcome-fine">
         {supported ? 'Your data stays in the folder you choose (OneDrive is fine). Nothing is uploaded. ' : ''}
-        The demo uses fictional sample data, saved only in this browser.
+        The demo uses fictional sample data. Browser workspaces are saved only in this browser; import your client files from the sidebar.
       </p>
+      <ConfirmHost />
     </Shell>
   );
 }

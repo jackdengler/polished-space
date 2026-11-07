@@ -31,7 +31,7 @@ function useGlobalKeys() {
 function Banners() {
   const { status, error, adapter } = usePersistence();
   if (adapter?.kind === 'memory') {
-    return <div className="banner info">Demo mode: fictional sample data, saved only in this browser.</div>;
+    if (status !== 'error') return <div className="banner info">Saved only in this browser. Clearing your browser data erases it.</div>;
   }
   if (status === 'conflict') {
     return (

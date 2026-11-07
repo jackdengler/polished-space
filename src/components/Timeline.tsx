@@ -4,7 +4,7 @@ import {
   allTasks, boardProgress, isAfterPlannedThrough, isOverdue, isPastMeeting, memberById, sortedMeetings,
 } from '../model/derive';
 import { formatFlex, formatFlexShort, flexEnd, flexStart, parseFlexDate } from '../model/flexDate';
-import { ADHOC, type Client } from '../model/schema';
+import { ADHOC, type Client, type Meeting } from '../model/schema';
 import { buildScale } from '../model/timelineScale';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
@@ -50,14 +50,15 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
       const day = dayNumber(`${y}-${String(m).padStart(2, '0')}-01`);
       if (day > scale.endDay) break;
       const x = scale.x(day);
-      if (x - lastX > 46) {
+      // Skip a month label that would sit on the "Today" label.
+      if (x - lastX > 46 && Math.abs(x - scale.x(todayN)) > 44) {
         out.push({ x, label: m === 1 || out.length === 0 ? `${MONTH_SHORT[m - 1]} ${y}` : MONTH_SHORT[m - 1]! });
         lastX = x;
       }
       if (++m > 12) { m = 1; y++; }
     }
     return out;
-  }, [scale]);
+  }, [scale, todayN]);
 
   // Open scrolled so "today" sits near the left third.
   useLayoutEffect(() => {
@@ -105,7 +106,7 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
                     {openPast && <span className="warn-dot" aria-label="Past meeting with open tasks" />}
                     {complete && <Icon name="check" size={12} className="done-mark" />}
                   </span>
-                  <span className="tl-tile-title">{m.title || 'Meeting'}</span>
+                  <span className={`tl-tile-title${m.title ? '' : ' derived'}`}>{meetingLabel(m)}</span>
                   <span className="tl-tile-progress">
                     <span className="bar"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></span>
                     <span className="count">{p.done}/{p.total}</span>
@@ -140,6 +141,11 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
       <AddMeetingButton client={client} />
     </section>
   );
+}
+
+/** The meeting's title, or else what it covers (its deliverables). */
+function meetingLabel(m: Meeting): string {
+  return m.title || m.deliverables.map((d) => d.title).join(', ') || 'Meeting';
 }
 
 function AddMeetingButton({ client }: { client: Client }) {

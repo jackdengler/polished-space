@@ -141,6 +141,32 @@ try {
     await expectText(page.locator('.archived-toggle'), 'Archived (2)');
   });
 
+  await step('imports a client file from the previous tracker', async () => {
+    // Fictional client in the old export shape, with a 1×1 PNG logo.
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const legacy = {
+      id: 'client_e2e', name: 'Imported Widgets', customLogo: png, plannedThrough: '2027-03-01',
+      staffing: { principal: ['Pat Lee'], consultant: [] }, team: [],
+      meetings: [
+        { id: 'adhoc', isAdHoc: true, name: '', date: '', deliverables: [{ id: '1', name: 'Billing', tasks: [{ id: '2', name: 'Send invoice', assignees: ['Pat Lee'], due: '2026-12-01', complete: false }] }] },
+        { id: '3', isAdHoc: false, name: 'Fall 2026', date: '2025-10-28', deliverables: [{ id: '4', name: 'Equity guidelines', tasks: [{ id: '5', name: 'Draft', assignees: [], due: '', complete: true }] }] },
+      ],
+      pastMeetings: [],
+    };
+    await page.getByLabel('Client files to import').setInputFiles([
+      { name: 'client_e2e.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) },
+      { name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from('{"hello":1}') },
+    ]);
+    await page.getByRole('dialog', { name: 'Imported 1 client' }).waitFor();
+    await expectText(page.locator('.import-skipped'), 'notes.json');
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expectText(page.locator('.client-name'), 'Imported Widgets');
+    await page.locator('.client-header img.client-logo').waitFor();
+    await page.locator('.tl-tile', { hasText: 'Fall 2026' }).waitFor();
+    await page.locator('.tl-adhoc').click();
+    await expectText(page.locator('.task-card'), 'Send invoice');
+  });
+
   await step('demo client page screenshot', async () => {
     await page.locator('.client-item', { hasText: 'Northwind Health' }).click();
     await page.locator('.tl-tile.selected').waitFor();
