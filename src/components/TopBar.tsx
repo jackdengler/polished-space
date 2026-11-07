@@ -51,7 +51,7 @@ function SavePill() {
   return <span className="save-pill ok" role="status" title={`Saved to ${adapter?.name ?? 'your folder'}`}><span className="dot" />{busy ? 'Saving…' : 'Saved'}</span>;
 }
 
-const backupName = () => `compensian-pm-backup-${todayIso()}.json`;
+const backupName = () => `planr-backup-${todayIso()}.json`;
 const backupText = () => JSON.stringify(useStore.getState().ws, null, 2);
 
 const markBackedUp = () => setPrefs({ lastBackupAt: new Date().toISOString() });

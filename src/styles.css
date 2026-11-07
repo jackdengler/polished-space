@@ -244,8 +244,8 @@ img.client-logo { mix-blend-mode: var(--logo-blend); }
 .import-skipped ul { margin: 4px 0 0; padding-left: 18px; }
 .welcome-fine { margin: 6px 0 0; font-size: 12.5px; color: var(--text-muted); }
 
-.brand.big { font-size: 19px; gap: 10px; }
-.brand.big .brand-mark { width: 30px; height: 30px; border-radius: 8px; }
+.brand.big { gap: 10px; }
+.brand.big .brand-name { font-size: 21px; letter-spacing: -0.02em; }
 
 /* ---------- App layout ---------- */
 .app { display: flex; height: 100%; overflow: hidden; }
@@ -256,7 +256,7 @@ img.client-logo { mix-blend-mode: var(--logo-blend); }
 .sidebar { width: 240px; flex: none; display: flex; flex-direction: column; background: var(--bg-sidebar); border-right: 1px solid var(--border); }
 .sidebar-top { padding: var(--s3) var(--s3) var(--s2); display: flex; flex-direction: column; gap: var(--s2); }
 .brand { display: flex; align-items: center; gap: var(--s2); min-width: 0; height: 28px; }
-.brand-mark { flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--accent); color: var(--accent-text); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; }
+.brand-mark { flex: none; display: block; }
 .brand-name { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .undo-redo { margin-left: auto; display: inline-flex; gap: 2px; }
 .workspace-btn { display: flex; align-items: center; gap: var(--s2); height: 34px; padding: 0 var(--s2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--text-muted); font-size: 13px; text-align: left; box-shadow: var(--shadow-sm); }

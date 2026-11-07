@@ -9,6 +9,7 @@ import { readSeed } from '../seed';
 import { embedded } from '../lib/env';
 import { attach, flush } from '../storage/persistence';
 import { Icon } from './Icon';
+import { BrandMark } from './BrandMark';
 
 const supported = typeof window.showDirectoryPicker === 'function' && !embedded;
 const BROWSER_KEY = 'compensian-pm-demo';
@@ -104,7 +105,7 @@ export function Welcome() {
           </button>
         )}
         {(supported || testStorage) && (
-          <button className={`btn btn-lg${saved ? '' : ' btn-primary'}`} disabled={busy} onClick={() => void pick()}>
+          <button className={`btn btn-lg${saved || seed ? '' : ' btn-primary'}`} disabled={busy} onClick={() => void pick()}>
             <Icon name="folder" size={16} /> {testStorage ? 'Use test storage' : saved ? 'Open a different folder' : 'Open or create a workspace folder'}
           </button>
         )}
@@ -160,7 +161,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="welcome">
       <div className="welcome-card">
-        <div className="brand big"><span className="brand-mark"><Icon name="check" size={18} /></span><span className="brand-name">Compensian PM</span></div>
+        <div className="brand big"><BrandMark size={30} /><span className="brand-name">Planr</span></div>
         {children}
       </div>
     </div>

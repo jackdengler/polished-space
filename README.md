@@ -1,4 +1,4 @@
-# Compensian PM
+# Planr
 
 A project tracker for client work. Clients are listed in a left sidebar. Each client page shows
 the client's info, a **timeline of meetings**, and the selected meeting's work as

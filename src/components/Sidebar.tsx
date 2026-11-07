@@ -10,6 +10,7 @@ import { closeWorkspace, usePersistence } from '../storage/persistence';
 import { openTeamSettings } from '../ui';
 import { ClientLogo } from './Avatar';
 import { Icon } from './Icon';
+import { BrandMark } from './BrandMark';
 import { ImportClients, type ImportHandle } from './ImportClients';
 import { AddInput } from './InlineEdit';
 import { Popover } from './Popover';
@@ -43,8 +44,8 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
     <aside className="sidebar">
       <div className="sidebar-top">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">C</span>
-          <span className="brand-name">Compensian PM</span>
+          <BrandMark />
+          <span className="brand-name">Planr</span>
         </div>
         <WorkspaceMenu />
       </div>
