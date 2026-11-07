@@ -15,14 +15,12 @@ export function Sidebar({ route }: { route: Route }) {
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
   const adapter = usePersistence((s) => s.adapter);
-  const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
-  const match = (c: Client) => c.name.toLowerCase().includes(q.trim().toLowerCase());
   const byName = (a: Client, b: Client) => a.name.localeCompare(b.name);
-  const active = clients.filter((c) => !c.archived && match(c)).sort(byName);
-  const archived = clients.filter((c) => c.archived && match(c)).sort(byName);
+  const active = clients.filter((c) => !c.archived).sort(byName);
+  const archived = clients.filter((c) => c.archived).sort(byName);
 
   const item = (c: Client) => (
     <a key={c.id} href={`#/c/${c.id}`} className={`client-item${route.clientId === c.id ? ' active' : ''}`}
@@ -39,10 +37,6 @@ export function Sidebar({ route }: { route: Route }) {
           <span className="brand-mark"><Icon name="check" size={14} /></span>
           <span className="brand-name" title={adapter?.name}>{adapter?.name}</span>
         </div>
-        <div className="search">
-          <Icon name="search" size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients" aria-label="Search clients" />
-        </div>
       </div>
 
       <nav className="client-list" aria-label="Clients">
@@ -57,7 +51,7 @@ export function Sidebar({ route }: { route: Route }) {
         )}
         {active.map(item)}
         {active.length === 0 && !adding && (
-          <div className="sidebar-empty">{q ? 'No clients match.' : <button className="link" onClick={() => setAdding(true)}>Add your first client</button>}</div>
+          <div className="sidebar-empty"><button className="link" onClick={() => setAdding(true)}>Add your first client</button></div>
         )}
         {archived.length > 0 && (
           <>
