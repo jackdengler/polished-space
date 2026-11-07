@@ -33,10 +33,6 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
         <span className="nav-name">{c.name}</span>
         <DueDot client={c} today={today} />
       </a>
-      <button className="icon-btn tiny archive-btn" title={c.archived ? 'Unarchive' : 'Archive'} aria-label={`${c.archived ? 'Unarchive' : 'Archive'} ${c.name}`}
-        onClick={() => useStore.getState().setArchived(c.id, !c.archived)}>
-        <Icon name={c.archived ? 'unarchive' : 'archive'} size={13} />
-      </button>
     </div>
   );
 

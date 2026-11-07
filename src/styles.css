@@ -287,8 +287,6 @@ img.client-logo { mix-blend-mode: var(--logo-blend); }
 .nav-dot.overdue { background: var(--danger); }
 .nav-dot.thisWeek { background: #e0a800; }
 .nav-dot.nextWeek { background: var(--success); }
-.archive-btn { opacity: 0; }
-.nav-item:hover .archive-btn, .archive-btn:focus-visible { opacity: 1; }
 .badge { margin-left: auto; min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .sidebar-add { margin: 2px 0 var(--s1); }
 .sidebar-empty { padding: var(--s2) 6px; font-size: 13px; color: var(--text-muted); }

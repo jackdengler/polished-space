@@ -178,15 +178,12 @@ try {
     await expectText(page.locator('.task-card'), 'Send invoice');
   });
 
-  await step('archives and unarchives from the sidebar', async () => {
-    const item = page.locator('.nav-item', { hasText: 'Bluebird Logistics' });
-    await item.hover();
-    await item.getByRole('button', { name: 'Archive Bluebird Logistics' }).click();
+  await step('archives and unarchives from the client menu', async () => {
+    await page.locator('.nav-item', { hasText: 'Bluebird Logistics' }).locator('.nav-link').click();
+    await page.getByRole('button', { name: 'Client actions' }).click();
+    await page.getByRole('menuitem', { name: 'Archive client' }).click();
     await expectText(page.locator('.archived-toggle'), 'Archived (3)');
-    await page.locator('.archived-toggle').click();
-    const archived = page.locator('.archived .nav-item', { hasText: 'Bluebird Logistics' });
-    await archived.hover();
-    await archived.getByRole('button', { name: 'Unarchive Bluebird Logistics' }).click();
+    await page.getByRole('button', { name: 'Unarchive' }).click();
     await expectText(page.locator('.archived-toggle'), 'Archived (2)');
   });
 
