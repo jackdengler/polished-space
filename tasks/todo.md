@@ -234,6 +234,14 @@ other people's work at my clients.
 - **On the timeline:** a small ⚑ flag on the axis at the kickoff date, in the meeting's lane color. Hover shows "Kickoff for <meeting>". Faded once done.
 - **Not available:** kickoffs can't be starred as key tasks, and they have no assignee (they belong to the client's team).
 
+## Due-date display (added)
+- **Day of week** on every due date on client pages: "Tue Oct 28" (the year is added when it's not this year).
+  Also used in hover cards and timeline dot tooltips.
+- **Weekend flag:** a task due on a Saturday or Sunday gets an amber due chip with a small ⚠ ("⚠ Sat Nov 14"), with the tooltip "Due on a weekend".
+  - Shown on client-page cards and calendar chips (with the weekend hidden, the chip already lands on Friday tagged Sat/Sun; it gets the same amber flag).
+  - Overdue red takes priority over amber.
+  - Done tasks drop the flag.
+
 ## Data model
 - **Schema stays version 1:** the two new fields have defaults (`keyFor: []`, `kickoff: null`), so existing workspace.json files, browser copies and imports load unchanged.
 - **Everything else** comes from existing fields (`dueDate`, `assigneeId`, `teamMemberIds`, meeting `date`).
@@ -255,6 +263,7 @@ other people's work at my clients.
 - [ ] Add task on a day: popover (client → meeting/Ad-hoc → deliverable → name)
 - [ ] First-run "who are you?" picker
 - [ ] Key tasks: schema default, toggleKey, star on cards and calendar chips, gold styling (light and dark)
+- [ ] Due dates: weekday format helper (unit-tested), weekend flag on cards and calendar
 - [ ] Kickoff dates: schema default, meeting-header control, calendar chips (check, drag, overdue), timeline flag
 - [ ] e2e: pick me, check off, drag to a day, push to next week, add task, click through
 - [ ] Screenshot review in light and dark, then republish the hosted page with your data
