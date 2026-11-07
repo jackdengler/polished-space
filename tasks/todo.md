@@ -214,10 +214,36 @@ other people's work at my clients.
 - **Empty states:** "Nothing due" on empty days; before "me" is picked, a short prompt to choose yourself.
 - **Hover:** the card is a drag handle (6px threshold) and a click target; the checkbox toggles done; the hover card is read-only.
 
+## Key tasks (added)
+- **Personal:** each person stars their own key tasks, and you only see gold on yours.
+  Stored with the data as `task.keyFor: memberId[]`, so it follows you across devices and works once coworkers share a workspace.
+- **Mark or unmark** from the task card's ⋯ menu, or with a ☆ that appears on hover. On the calendar, use the hover card's star.
+  If "me" isn't chosen yet, starring asks you to pick yourself first.
+- **Gold on:** task cards on meeting and ad-hoc pages (gold border, gold ★) and weekly-calendar chips (gold background, gold ★), including in Overdue.
+  Not on the timeline or sidebar (decided).
+- **Done key tasks** keep a faint gold edge, so you can still tell what they were.
+
+## Meeting kickoff dates (added)
+- **What it is:** a meeting can have a **kickoff date**, when work on it should start. Set it from the meeting page header ("Kickoff: Set date"), with a date picker and a clear option.
+  Stored as `meeting.kickoff: { date, done } | null`.
+- **On the calendar,** it flows through like a task: a chip "⚑ Kickoff · <meeting>" with the client logo, in **My work** for everyone on that client's team.
+  - Check it off, which means work has started.
+  - Drag it to another day or to Next week →.
+  - If it's past and not checked off, it goes to Overdue.
+  - Click it to open that meeting.
+- **On the timeline:** a small ⚑ flag on the axis at the kickoff date, in the meeting's lane color. Hover shows "Kickoff for <meeting>". Faded once done.
+- **Not available:** kickoffs can't be starred as key tasks, and they have no assignee (they belong to the client's team).
+
 ## Data model
-No schema change. Everything comes from existing fields (`dueDate`, `assigneeId`, `teamMemberIds`, meeting `date`).
-"Me", the weekend toggle and the hide-done toggle live in localStorage (per device).
-New store action: `moveTaskToDate(taskId, isoDate)` (thin wrapper over updateTask, for clarity and future sync), plus the existing `addTask` + `updateTask`.
+- **Schema stays version 1:** the two new fields have defaults (`keyFor: []`, `kickoff: null`), so existing workspace.json files, browser copies and imports load unchanged.
+- **Everything else** comes from existing fields (`dueDate`, `assigneeId`, `teamMemberIds`, meeting `date`).
+- **Per device:** "me", the weekend toggle and the hide-done toggle live in localStorage.
+- **New store actions:**
+  - `moveTaskToDate(taskId, isoDate)`
+  - `toggleKey(taskId, memberId)`
+  - `setKickoff(clientId, meetingId, isoDate | null)`
+  - `toggleKickoffDone(clientId, meetingId)`
+  - `moveKickoffToDate(clientId, meetingId, isoDate)`
 
 ## Build checklist
 - [ ] Pure `model/week.ts`: week start (Monday), days, task/meeting bucketing (rows, weekend → Friday, overdue) — unit tests
@@ -228,5 +254,7 @@ New store action: `moveTaskToDate(taskId, isoDate)` (thin wrapper over updateTas
 - [ ] Drag & drop between days / to next week (dnd-kit, one DndContext for the grid)
 - [ ] Add task on a day: popover (client → meeting/Ad-hoc → deliverable → name)
 - [ ] First-run "who are you?" picker
+- [ ] Key tasks: schema default, toggleKey, star on cards and calendar chips, gold styling (light and dark)
+- [ ] Kickoff dates: schema default, meeting-header control, calendar chips (check, drag, overdue), timeline flag
 - [ ] e2e: pick me, check off, drag to a day, push to next week, add task, click through
 - [ ] Screenshot review in light and dark, then republish the hosted page with your data
