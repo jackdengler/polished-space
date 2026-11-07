@@ -127,7 +127,9 @@ try {
     await page.getByPlaceholder('Task name, then Enter').fill('Send SOW');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
-    await page.locator('.task-card', { hasText: 'Send SOW' }).locator('input[type=date]').fill('2026-01-15');
+    await page.locator('.task-card', { hasText: 'Send SOW' }).getByRole('button', { name: 'Set due date' }).click();
+    await page.getByLabel('Type a date').fill('1/15/26'); // typed, with an explicit past year
+    await page.keyboard.press('Enter');
     await page.locator('.tl-dot.overdue').waitFor();
     await expectText(page.locator('.adhoc-pill'), '1 overdue');
   });
@@ -200,7 +202,8 @@ try {
     await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
     await page.locator('.adhoc-pill').click();
     const card = page.locator('.task-card', { hasText: 'Request 2026 org chart' });
-    await card.locator('input[type=date]').fill(saturdayIso);
+    await card.getByRole('button', { name: /Due|Set due date/ }).click();
+    await page.getByLabel('Pick a date').fill(saturdayIso); // picked from the calendar
     await expectText(card.locator('.meta-btn.weekend'), 'Sat');
   });
 
@@ -256,7 +259,8 @@ try {
     await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
     await page.locator('.tl-tile', { hasText: 'Leadership readout' }).click();
     const kickDay = addDaysIso(mondayIso, 2);
-    await page.locator('.kickoff input[type=date]').fill(kickDay);
+    await page.getByRole('button', { name: 'Kickoff date' }).click();
+    await page.getByLabel('Pick a date').fill(kickDay);
     await page.locator('.tl-kickoff').first().waitFor();
     await page.locator('.nav-link-row', { hasText: 'This week' }).click();
     await page.locator('.wg-cell .chip.kickoff', { hasText: 'Leadership readout' }).waitFor();

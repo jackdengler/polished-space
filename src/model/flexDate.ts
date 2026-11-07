@@ -1,4 +1,4 @@
-import { daysInMonth, formatLong, formatNumeric, formatShort, isoDate, isValidYmd, MONTH_SHORT, dayNumber, parseIso, todayIso } from './dates';
+import { addDays, dayOfWeek, daysInMonth, formatLong, formatNumeric, formatShort, isoDate, isValidYmd, MONTH_SHORT, dayNumber, parseIso, todayIso } from './dates';
 
 /**
  * A date that is either exact ("10/28/26") or a broader period ("Fall 2026").
@@ -75,6 +75,16 @@ export function parseFlexDate(input: string, today: string = todayIso()): FlexDa
   if ((m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/))) {
     const y = parseYear(m[3]!);
     return y === null ? null : exact(y, +m[1]!, +m[2]!);
+  }
+
+  // today / tomorrow / a weekday ("fri", "next mon") → the next such day (today counts)
+  if (s === 'today') return { kind: 'exact', date: today };
+  if (s === 'tomorrow' || s === 'tmrw') return { kind: 'exact', date: addDays(today, 1) };
+  if ((m = s.match(/^(next )?(sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*$/))) {
+    const target = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(m[2]!.slice(0, 3));
+    let ahead = (target - dayOfWeek(today) + 7) % 7;
+    if (m[1] && ahead === 0) ahead = 7; // "next fri" on a Friday means a week out
+    return { kind: 'exact', date: addDays(today, ahead) };
   }
 
   // 11/2 → snapped to the right year

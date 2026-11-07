@@ -465,7 +465,6 @@ img.client-logo { mix-blend-mode: var(--logo-blend); }
 .meta-btn.overdue { color: var(--danger); background: var(--danger-soft); font-weight: 500; }
 .meta-btn.subtask-count.all { color: var(--success); }
 .due-wrap { position: relative; display: inline-flex; }
-.hidden-date { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
 .subtasks { margin: 8px 0 0 24px; padding-top: 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; cursor: default; }
 .subtask { display: flex; align-items: center; gap: 7px; font-size: 13px; }
 .subtask.done .inline-edit { color: var(--text-muted); text-decoration: line-through; }
@@ -612,3 +611,4 @@ button.column-count:hover { background: color-mix(in srgb, var(--success) 12%, v
 .dupes-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s1); }
 .dupe-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .dupe-row .btn { margin-left: auto; height: 24px; }
+.date-box input[type=date] { margin-top: var(--s1); }
