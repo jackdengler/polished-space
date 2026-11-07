@@ -607,3 +607,8 @@ button.column-count:hover { background: color-mix(in srgb, var(--success) 12%, v
 .avatar-stack { display: inline-flex; align-items: center; }
 .avatar-stack .avatar + .avatar { margin-left: -5px; }
 .stack-more { margin-left: 3px; font-size: 11px; font-weight: 650; color: var(--text-muted); }
+
+.dupes { margin: 0 0 var(--s3); padding: var(--s2) var(--s3); border-radius: var(--radius); background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent); font-size: 13px; }
+.dupes-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s1); }
+.dupe-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.dupe-row .btn { margin-left: auto; height: 24px; }

@@ -73,6 +73,15 @@ describe('convertLegacyClients', () => {
     expect(r.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toEqual([r.newMembers[1]!.id]);
   });
 
+  it('folds short names into the full person (who has the role)', () => {
+    const data = { ...legacy, id: 'client_444', staffing: { principal: ['Patricia Lee'] }, team: ['Pat'], pastMeetings: [],
+      meetings: [{ id: 'adhoc', isAdHoc: true, name: '', date: '', deliverables: [{ id: '1', name: 'X', tasks: [{ id: '2', name: 't', assignees: ['Pat'], due: '', complete: false }] }] }] };
+    const r = convertLegacyClients([{ name: 'a.json', data }], emptyWorkspace(), opts);
+    expect(r.newMembers.map((m) => [m.name, m.role])).toEqual([['Patricia Lee', 'Principal']]);
+    expect(r.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toEqual([r.newMembers[0]!.id]);
+    expect(r.clients[0]!.teamMemberIds).toEqual([r.newMembers[0]!.id]);
+  });
+
   it('keeps every assignee', () => {
     const data = { ...legacy, id: 'client_333', staffing: {}, team: [], pastMeetings: [],
       meetings: [{ id: 'adhoc', isAdHoc: true, name: '', date: '', deliverables: [{ id: '1', name: 'X', tasks: [{ id: '2', name: 't', assignees: ['Pat Lee', 'Sam Fox', 'pat lee'], due: '', complete: false }] }] }] };

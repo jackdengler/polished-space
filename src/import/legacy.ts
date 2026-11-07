@@ -1,5 +1,6 @@
 import { parseFlexDate, type FlexDate } from '../model/flexDate';
 import { cleanName, MEMBER_COLORS } from '../model/derive';
+import { findAliases } from '../model/people';
 import type { Client, Deliverable, Role, Task, TeamMember, Workspace } from '../model/schema';
 
 /**
@@ -37,6 +38,34 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const isIso = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/**
+ * Short or misspelled names for people who already exist ("Sam" → "Samantha
+ * Reyes") are folded into that person, so they pick up the right role, as the
+ * old app did. Only newly imported people are merged; existing ones never are.
+ */
+function resolveNewAliases(result: ImportResult, existing: Workspace) {
+  const tasks = result.clients.flatMap((c) => [c.adhoc, ...c.meetings].flatMap((b) => b.deliverables.flatMap((d) => d.tasks)));
+  const count = (id: string) => tasks.filter((t) => t.assigneeIds.includes(id)).length;
+  const newIds = new Set(result.newMembers.map((m) => m.id));
+  const aliases = findAliases([...existing.teamMembers, ...result.newMembers], count).filter((a) => newIds.has(a.fromId));
+  if (!aliases.length) return;
+  const into = new Map(aliases.map((a) => [a.fromId, a.intoId]));
+  const map = (ids: string[]) => [...new Set(ids.map((id) => into.get(id) ?? id))];
+  for (const a of aliases) {
+    const from = result.newMembers.find((m) => m.id === a.fromId)!;
+    const target = result.newMembers.find((m) => m.id === a.intoId);
+    if (target && target.role === 'Unassigned' && from.role !== 'Unassigned') target.role = from.role;
+  }
+  for (const c of result.clients) {
+    c.teamMemberIds = map(c.teamMemberIds);
+    for (const t of [c.adhoc, ...c.meetings].flatMap((b) => b.deliverables.flatMap((d) => d.tasks))) {
+      t.assigneeIds = map(t.assigneeIds);
+      t.keyFor = map(t.keyFor);
+    }
+  }
+  result.newMembers = result.newMembers.filter((m) => !into.has(m.id));
+}
 
 export function looksLikeLegacyClient(data: unknown): boolean {
   const o = obj(data);
@@ -140,5 +169,6 @@ export function convertLegacyClients(
     const taskCount = [...client.adhoc.deliverables, ...meetings.flatMap((m) => m.deliverables)].reduce((n, d) => n + d.tasks.length, 0);
     result.summary.push({ name: client.name, meetings: meetings.length, tasks: taskCount });
   }
+  resolveNewAliases(result, existing);
   return result;
 }

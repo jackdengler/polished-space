@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { byRoleThenName, MEMBER_COLORS } from '../model/derive';
+import { findAliases } from '../model/people';
 import { ROLES, type Role } from '../model/schema';
 import type { TeamMember } from '../model/schema';
 import { useStore } from '../store/store';
@@ -60,7 +61,7 @@ function MergeButton({ member, others }: { member: TeamMember; others: TeamMembe
 export function TeamSettings() {
   const open = useUi((s) => s.teamOpen);
   const ws = useStore((s) => s.ws);
-  const { addMember, updateMember, deleteMember } = useStore.getState();
+  const { addMember, updateMember, deleteMember, mergeMember } = useStore.getState();
   const [adding, setAdding] = useState(false);
 
   const counts = useMemo(() => {
@@ -70,6 +71,8 @@ export function TeamSettings() {
     return n;
   }, [ws]);
 
+  const aliases = useMemo(() => findAliases(ws.teamMembers, (id) => counts.get(id) ?? 0), [ws.teamMembers, counts]);
+
   if (!open) return null;
   const close = () => useUi.setState({ teamOpen: false });
   const members = [...ws.teamMembers].sort(byRoleThenName);
@@ -77,6 +80,23 @@ export function TeamSettings() {
   return (
     <Modal title="People" onClose={close} width={560}>
       <p className="modal-text">Everyone who can be put on clients and assigned tasks. A person's role decides where they appear in staffing.</p>
+      {aliases.length > 0 && (
+        <div className="dupes">
+          <div className="dupes-head">
+            <b>Possible duplicates ({aliases.length})</b>
+            <button className="btn btn-sm" onClick={() => aliases.forEach((a) => mergeMember(a.fromId, a.intoId))}>Merge all</button>
+          </div>
+          {aliases.map((a) => {
+            const from = ws.teamMembers.find((m) => m.id === a.fromId)!, into = ws.teamMembers.find((m) => m.id === a.intoId)!;
+            return (
+              <div key={a.fromId} className="dupe-row">
+                <span>{from.name}</span><Icon name="chevronRight" size={12} /><span><b>{into.name}</b> <span className="muted">· {into.role}</span></span>
+                <button className="btn btn-sm btn-ghost" onClick={() => mergeMember(a.fromId, a.intoId)}>Merge</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="team-list">
         {members.map((m, i) => (<div key={m.id}>
           {(i === 0 || members[i - 1]!.role !== m.role) && <div className="team-group">{m.role}</div>}
