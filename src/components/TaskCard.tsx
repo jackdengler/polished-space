@@ -41,22 +41,33 @@ function AssigneeButton({ task, client }: { task: Task; client: Client }) {
 
 function DueButton({ task }: { task: Task }) {
   const input = useRef<HTMLInputElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const [fallback, setFallback] = useState(false);
   const today = todayIso();
   const overdue = isOverdue(task, today);
+  const setDue = (v: string) => useStore.getState().updateTask(task.id, { dueDate: v || null });
   const open = () => {
-    const el = input.current;
-    if (!el) return;
-    try { el.showPicker(); } catch { el.focus(); }
+    try { input.current!.showPicker(); } catch { setFallback(true); } // some embedded pages block the native picker
   };
   return (
     <span className="due-wrap">
-      <button className={`meta-btn${task.dueDate ? '' : ' empty'}${overdue ? ' overdue' : ''}`} onClick={open}
+      <button ref={button} className={`meta-btn${task.dueDate ? '' : ' empty'}${overdue ? ' overdue' : ''}`} onClick={open}
         aria-label={task.dueDate ? `Due ${formatLong(task.dueDate)}. Change` : 'Set due date'}
         title={task.dueDate ? `Due ${formatLong(task.dueDate)}${overdue ? ' (overdue)' : ''}` : 'Set due date'}>
         <Icon name="calendar" size={13} /><span>{task.dueDate ? formatShort(task.dueDate, today) : 'Due'}</span>
       </button>
       <input ref={input} type="date" className="hidden-date" tabIndex={-1} aria-hidden="true" value={task.dueDate ?? ''}
-        onChange={(e) => useStore.getState().updateTask(task.id, { dueDate: e.target.value || null })} />
+        onChange={(e) => setDue(e.target.value)} />
+      <Popover anchor={button} open={fallback} onClose={() => setFallback(false)} width={220}>
+        <div className="form">
+          <label className="field-label" htmlFor={`due-${task.id}`}>Due date</label>
+          <input id={`due-${task.id}`} type="date" className="text-input" autoFocus value={task.dueDate ?? ''} onChange={(e) => setDue(e.target.value)} />
+          <div className="form-actions">
+            {task.dueDate && <button className="btn btn-sm" onClick={() => { setDue(''); setFallback(false); }}>Clear</button>}
+            <button className="btn btn-sm btn-primary" onClick={() => setFallback(false)}>Done</button>
+          </div>
+        </div>
+      </Popover>
     </span>
   );
 }

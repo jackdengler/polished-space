@@ -3,11 +3,14 @@ import { makeDemoWorkspace } from '../model/demo';
 import { emptyWorkspace, type Workspace } from '../model/schema';
 import { FolderAdapter } from '../storage/folderAdapter';
 import { forgetFolder, getSavedFolder, saveFolder } from '../storage/handleStore';
-import { MemoryAdapter } from '../storage/memoryAdapter';
+import { clearSavedDemo, loadSavedDemo, MemoryAdapter } from '../storage/memoryAdapter';
 import { attach, flush } from '../storage/persistence';
 import { Icon } from './Icon';
 
-const supported = typeof window.showDirectoryPicker === 'function';
+/** Embedded previews (e.g. a hosted page inside another site) can't open folders. */
+const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
+const supported = typeof window.showDirectoryPicker === 'function' && !embedded;
+const DEMO_KEY = 'compensian-pm-demo';
 /** `?storage=opfs` uses the browser's private file system instead of a picked folder (for automated tests). */
 const testStorage = new URLSearchParams(location.search).get('storage') === 'opfs';
 
@@ -16,6 +19,8 @@ export function Welcome() {
   const [emptyFolder, setEmptyFolder] = useState<FolderAdapter | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [savedDemo, setSavedDemo] = useState(() => loadSavedDemo(DEMO_KEY));
+  const startDemo = (ws: Workspace) => attach(new MemoryAdapter(ws, DEMO_KEY), ws);
 
   useEffect(() => {
     if (testStorage) return;
@@ -91,16 +96,25 @@ export function Welcome() {
             <Icon name="folder" size={16} /> {testStorage ? 'Use test storage' : saved ? 'Open a different folder' : 'Open or create a workspace folder'}
           </button>
         )}
-        <button className="btn btn-lg" onClick={() => attach(new MemoryAdapter(), makeDemoWorkspace())}>Try the demo</button>
+        <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startDemo(savedDemo ?? makeDemoWorkspace())}>
+          {savedDemo ? 'Continue the demo' : 'Try the demo'}
+        </button>
       </div>
+      {savedDemo && (
+        <button className="link small" onClick={() => { clearSavedDemo(DEMO_KEY); setSavedDemo(null); }}>Reset the demo to fresh sample data</button>
+      )}
       {saved && <button className="link small" onClick={() => { void forgetFolder(); setSaved(null); }}>Forget “{saved.name}”</button>}
       {error && <p className="welcome-error" role="alert"><Icon name="alert" size={14} /> {error}</p>}
       {!supported && !testStorage && (
-        <p className="welcome-error">This browser can't save to a folder. Open the app in Chrome or Edge, or try the demo.</p>
+        <p className="welcome-note">
+          {embedded
+            ? 'This preview can try the demo only. To save real data to a folder, open the full app in Chrome or Edge.'
+            : "This browser can't save to a folder. Open the app in Chrome or Edge, or try the demo."}
+        </p>
       )}
       <p className="welcome-fine">
-        Your data stays in the folder you choose (OneDrive is fine) — nothing is uploaded.
-        The demo uses sample data and isn't saved.
+        {supported ? 'Your data stays in the folder you choose (OneDrive is fine). Nothing is uploaded. ' : ''}
+        The demo uses fictional sample data, saved only in this browser.
       </p>
     </Shell>
   );

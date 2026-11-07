@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Workspace } from '../model/schema';
+import { navigate } from '../router';
 import { useStore } from '../store/store';
 import { ConflictError, type StorageAdapter } from './adapter';
 
@@ -73,5 +74,5 @@ export async function closeWorkspace() {
   unsubscribe?.();
   unsubscribe = undefined;
   usePersistence.setState({ adapter: null, status: 'saved', error: null });
-  history.replaceState(null, '', '#/');
+  navigate({}, { replace: true });
 }

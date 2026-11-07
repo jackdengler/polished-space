@@ -21,23 +21,46 @@ export function routeHref(r: Partial<Route>): string {
   return h;
 }
 
+// The current route lives in memory and is mirrored to the address bar when the
+// browser allows it (embedded previews may not), so navigation always works.
+let current = location.hash;
+let cached: { hash: string; route: Route } | null = null;
+const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((l) => l());
+
 export function navigate(r: Partial<Route>, opts: { replace?: boolean } = {}) {
   const href = routeHref(r);
-  if (location.hash === href) return;
-  if (opts.replace) history.replaceState(null, '', href);
-  else history.pushState(null, '', href);
-  window.dispatchEvent(new HashChangeEvent('hashchange'));
+  if (current === href) return;
+  current = href;
+  try {
+    if (opts.replace) history.replaceState(null, '', href);
+    else history.pushState(null, '', href);
+  } catch { /* address bar not available — in-memory routing still works */ }
+  notify();
 }
 
-let cached: { hash: string; route: Route } | null = null;
 function snapshot(): Route {
-  if (!cached || cached.hash !== location.hash) cached = { hash: location.hash, route: parse(location.hash) };
+  if (!cached || cached.hash !== current) cached = { hash: current, route: parse(current) };
   return cached.route;
 }
+
+function onBrowserNav() {
+  if (location.hash !== current) { current = location.hash; notify(); }
+}
+
 function subscribe(cb: () => void) {
-  window.addEventListener('hashchange', cb);
-  window.addEventListener('popstate', cb);
-  return () => { window.removeEventListener('hashchange', cb); window.removeEventListener('popstate', cb); };
+  listeners.add(cb);
+  if (listeners.size === 1) {
+    window.addEventListener('hashchange', onBrowserNav);
+    window.addEventListener('popstate', onBrowserNav);
+  }
+  return () => {
+    listeners.delete(cb);
+    if (listeners.size === 0) {
+      window.removeEventListener('hashchange', onBrowserNav);
+      window.removeEventListener('popstate', onBrowserNav);
+    }
+  };
 }
 
 export const useRoute = () => useSyncExternalStore(subscribe, snapshot);

@@ -43,6 +43,13 @@ than overwriting it.
   - Meetings after "planned through" are faded.
   - Dots under the timeline are ad-hoc tasks with due dates (red when overdue).
 
+### Hosted demo
+
+`npm run build:artifact` packs the app into one self-contained HTML file (`artifact/compensian-pm.html`) for hosting as a single page.
+When the app runs embedded like that:
+- it offers only the demo, since embedded pages can't open folders
+- demo changes are saved in that browser's local storage
+
 ## Development
 
 | Command | What it does |

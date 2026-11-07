@@ -28,7 +28,7 @@ export function ClientHeader({ client }: { client: Client }) {
       // The old file is kept so Undo can bring the previous logo back.
       setClientLogo(client.id, name);
     } catch {
-      alert('That image could not be read. Try a PNG, JPG or SVG.');
+      console.error('That image could not be read. Try a PNG, JPG or SVG.');
     }
   }
 
