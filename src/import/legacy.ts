@@ -1,6 +1,6 @@
 import { parseFlexDate, type FlexDate } from '../model/flexDate';
-import { MEMBER_COLORS } from '../model/derive';
-import type { Client, Deliverable, Task, TeamMember, Workspace } from '../model/schema';
+import { cleanName, MEMBER_COLORS } from '../model/derive';
+import type { Client, Deliverable, Role, Task, TeamMember, Workspace } from '../model/schema';
 
 /**
  * Converts client exports from the previous tracker (one JSON file per client)
@@ -25,7 +25,13 @@ export interface ImportResult {
   skipped: { file: string; reason: string }[];
 }
 
-const NO_END_YEAR = 2090; // "2099-12-31" was used as "no end date"
+const NO_END_YEAR = 2090;
+
+/** The old tool's staffing keys → roles. */
+const OLD_ROLES: Record<string, Role> = {
+  principal: 'Principal', srConsultant: 'Sr Consultant', consultant: 'Consultant',
+  srAssociate: 'Sr Associate', associate: 'Associate', unassigned: 'Unassigned',
+}; // "2099-12-31" was used as "no end date"
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -49,15 +55,17 @@ export function convertLegacyClients(
 
   const members = new Map(existing.teamMembers.map((m) => [m.name.toLowerCase(), m]));
   const newMembers: TeamMember[] = [];
-  const memberId = (rawName: string): string | null => {
-    const name = rawName.replace(/\s+/g, ' ').trim();
+  const memberId = (rawName: string, role?: Role): string | null => {
+    const name = cleanName(rawName);
     if (!name) return null;
     const key = name.toLowerCase();
     let m = members.get(key);
     if (!m) {
-      m = { id: newId(), name, color: MEMBER_COLORS[members.size % MEMBER_COLORS.length]! };
+      m = { id: newId(), name, color: MEMBER_COLORS[members.size % MEMBER_COLORS.length]!, role: role ?? 'Unassigned' };
       members.set(key, m);
       newMembers.push(m);
+    } else if (role && role !== 'Unassigned' && m.role === 'Unassigned' && newMembers.includes(m)) {
+      m.role = role; // a later client's staffing knows this new person's role
     }
     return m.id;
   };
@@ -79,8 +87,8 @@ export function convertLegacyClients(
     takenIds.add(clientId);
 
     // Staffing first, so people get their properly written names before task assignees are matched.
-    const staffing = Object.values(obj(src.staffing)).flatMap(arr);
-    const teamMemberIds = [...new Set([...staffing, ...arr(src.team)].map((n) => memberId(str(n))).filter((id): id is string => !!id))];
+    const staffing = Object.entries(obj(src.staffing)).flatMap(([key, names]) => arr(names).map((n) => memberId(str(n), OLD_ROLES[key])));
+    const teamMemberIds = [...new Set([...staffing, ...arr(src.team).map((n) => memberId(str(n)))].filter((id): id is string => !!id))];
 
     const toTask = (t: unknown): Task => {
       const o = obj(t);

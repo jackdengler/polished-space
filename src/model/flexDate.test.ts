@@ -38,6 +38,31 @@ describe('parseFlexDate', () => {
   });
 });
 
+describe('smart year snapping', () => {
+  const nov7 = '2026-11-07';
+  it.each([
+    ['11/2', '2026-11-02'],   // 5 days ago: stays this year
+    ['10/10', '2026-10-10'],  // 28 days ago: within the grace
+    ['10/1', '2027-10-01'],   // 37 days ago: next year
+    ['12/1', '2026-12-01'],   // ahead this year
+    ['1/15', '2027-01-15'],   // January → next year
+    ['Nov 30', '2026-11-30'],
+    ['Mar 3', '2027-03-03'],
+    ['march 3rd', '2027-03-03'],
+    ['2/29', '2028-02-29'],   // next leap day
+  ])('%s → %s', (input, iso) => {
+    expect(parseFlexDate(input, nov7)).toEqual({ kind: 'exact', date: iso });
+  });
+  it('rejects impossible yearless dates', () => {
+    expect(parseFlexDate('2/30', nov7)).toBeNull();
+    expect(parseFlexDate('13/2', nov7)).toBeNull();
+  });
+  it("still reads Jan '27 and Fall 26 as periods", () => {
+    expect(parseFlexDate("Jan '27", nov7)).toMatchObject({ kind: 'range', label: 'Jan 2027' });
+    expect(parseFlexDate('Fall 26', nov7)).toMatchObject({ kind: 'range', label: 'Fall 2026' });
+  });
+});
+
 describe('ordering and formatting', () => {
   it('sorts by start, exact before a period starting the same day', () => {
     const items = ['Fall 2026', '9/1/26', '8/15/26', 'Q4 2026'].map((s) => parseFlexDate(s)!);

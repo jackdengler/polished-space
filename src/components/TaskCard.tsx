@@ -78,7 +78,7 @@ function Subtasks({ task, adding, setAdding }: { task: Task; adding: boolean; se
         <div key={s.id} className={`subtask${s.done ? ' done' : ''}`}>
           <Checkbox small checked={s.done} onToggle={() => toggleSubtask(s.id)} label={`Subtask ${s.title}`} />
           <InlineEdit className="grow" value={s.title} label="subtask" onCommit={(v) => renameSubtask(s.id, v)} />
-          <button className="icon-btn tiny" aria-label={`Delete subtask ${s.title}`} onClick={() => deleteSubtask(s.id)}><Icon name="x" size={12} /></button>
+          <TwoStepDelete label={`Delete subtask ${s.title}`} onDelete={() => deleteSubtask(s.id)} />
         </div>
       ))}
       {adding
@@ -115,7 +115,7 @@ export function TaskCard({ task, client, highlight }: { task: Task; client: Clie
         <Menu className="icon-btn card-menu" button={<Icon name="more" size={15} />} label="Task actions" items={[
           { label: 'Add subtask', onSelect: () => { setExpanded(true); setAddingSub(true); } },
           { label: key ? 'Unmark key task' : 'Mark as key task', onSelect: () => { if (me) toggleKey(task.id, me.id); else askWhoAmI(); } },
-          { label: 'Delete task', danger: true, onSelect: () => deleteTask(task.id) },
+          { label: 'Delete task', danger: true, twoStep: true, onSelect: () => deleteTask(task.id) },
         ]} />
       </div>
       <div className="task-meta">
@@ -130,5 +130,23 @@ export function TaskCard({ task, client, highlight }: { task: Task; client: Clie
       </div>
       {(expanded || addingSub) && <Subtasks task={task} adding={addingSub} setAdding={setAddingSub} />}
     </div>
+  );
+}
+
+/** × that turns into a trash can; a second click within 2s deletes. */
+function TwoStepDelete({ label, onDelete }: { label: string; onDelete: () => void }) {
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <button className={`icon-btn tiny two-step${armed ? ' armed' : ''}`} aria-label={armed ? 'Click again to delete' : label} title={armed ? 'Click again to delete' : 'Delete'}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (armed) { clearTimeout(timer.current); onDelete(); return; }
+        setArmed(true);
+        timer.current = setTimeout(() => setArmed(false), 2000);
+      }}>
+      <Icon name={armed ? 'trash' : 'x'} size={12} />
+    </button>
   );
 }

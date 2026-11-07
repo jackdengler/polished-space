@@ -577,3 +577,29 @@ button.column-count:hover { background: color-mix(in srgb, var(--success) 12%, v
 .collapsed-row:hover { border-color: var(--success); color: var(--text); }
 .hidden-note { font-size: 12px; color: var(--text-muted); padding: 2px 4px; }
 .small-toggle { height: 26px; font-size: 12.5px; }
+
+/* ---------- Staffing overview ---------- */
+.staffing-page { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.staffing-page .week-head { gap: var(--s3); }
+.staffing-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 var(--s5) var(--s5); }
+.staffing-table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 960px; font-size: 13px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); }
+.staffing-table th { position: sticky; top: 0; z-index: 1; background: var(--bg-subtle); text-align: left; font-size: 11.5px; font-weight: 700; color: var(--text-muted); padding: var(--s2) var(--s3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.staffing-table th.sortable button { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: inherit; }
+.staffing-table th.sortable button:hover { color: var(--text); }
+.staffing-table td { padding: 6px var(--s3); border-bottom: 1px solid var(--border); vertical-align: middle; }
+.staffing-table tbody tr { cursor: pointer; }
+.staffing-table tbody tr:hover td { background: var(--bg-hover); }
+.staffing-table tbody tr:last-child td { border-bottom: 0; }
+.st-client { display: inline-flex; align-items: center; gap: var(--s2); font-weight: 600; white-space: nowrap; }
+.st-people { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-person { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px 1px 2px; border-radius: 12px; background: var(--bg-subtle); font-size: 12px; white-space: nowrap; }
+.st-person.me { box-shadow: 0 0 0 1.5px var(--accent); }
+.st-yes { display: inline-flex; align-items: center; gap: 3px; color: var(--success); font-weight: 600; }
+.st-no { color: var(--text-faint); }
+.st-next { display: block; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flip-y { transform: scaleY(-1); }
+.team-group { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: var(--s3) 0 var(--s1); }
+.role-select { height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 12.5px; padding: 0 4px; }
+.menu-item.armed { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+.two-step.armed { opacity: 1 !important; color: var(--danger); background: var(--danger-soft); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 70; background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 550; box-shadow: var(--shadow-lg); }

@@ -198,7 +198,7 @@ try {
   });
 
   await step('weekly calendar: pick me, add, check off, drag, push to next week', async () => {
-    await page.locator('.nav-link-row').click();
+    await page.locator('.nav-link-row', { hasText: 'This week' }).click();
     await page.getByPlaceholder('Find yourself…').fill('Alex');
     await page.keyboard.press('Enter');
     await page.locator('.week-grid').waitFor();
@@ -251,7 +251,7 @@ try {
     const kickDay = addDaysIso(mondayIso, 2);
     await page.locator('.kickoff input[type=date]').fill(kickDay);
     await page.locator('.tl-kickoff').first().waitFor();
-    await page.locator('.nav-link-row').click();
+    await page.locator('.nav-link-row', { hasText: 'This week' }).click();
     await page.locator('.wg-cell .chip.kickoff', { hasText: 'Leadership readout' }).waitFor();
     await page.screenshot({ path: 'test-results/week.png' });
   });
@@ -290,6 +290,43 @@ try {
     const after = await page.locator('.task-card.done').count();
     if (!(before > 0 && after === 0)) throw new Error(`hide done: ${before} → ${after}`);
     await page.getByLabel('Hide done').uncheck();
+  });
+
+  await step('people roles, staffing overview, copy tasks, two-step delete, year snapping', async () => {
+    // Role from the People list shows up in the Staffing columns.
+    await page.locator('.workspace-btn').click();
+    await page.getByRole('menuitem', { name: 'Team' }).click();
+    await page.getByLabel('Role for Sam Ortiz').selectOption('Principal');
+    await page.getByRole('dialog').getByRole('button', { name: 'Done' }).click();
+    await page.locator('.nav-link-row', { hasText: 'Staffing' }).click();
+    await page.locator('.staffing-table').waitFor();
+    const principalCol = await page.locator('.staffing-table thead th').allTextContents();
+    if (principalCol[1] !== 'Principal') throw new Error('first role column: ' + principalCol[1]);
+    await page.locator('.staffing-table tbody tr', { hasText: 'Northwind Health' }).click();
+    await expectText(page.locator('.client-name'), 'Northwind Health');
+
+    // Copy all tasks on a meeting.
+    await page.locator('.tl-tile', { hasText: 'Market data review' }).click();
+    await page.getByRole('button', { name: 'Meeting actions' }).click();
+    await page.getByRole('menuitem', { name: 'Copy all tasks' }).click();
+    await page.locator('.toast', { hasText: /Copied|Couldn't copy/ }).waitFor();
+
+    // Two-step delete of a task.
+    const card = page.locator('.task-card').first();
+    const title = await card.locator('.task-title').textContent();
+    await card.hover();
+    await card.getByRole('button', { name: 'Task actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete task' }).click();
+    await page.getByRole('menuitem', { name: 'Click again to delete' }).click();
+    await page.locator('.task-card', { hasText: title }).first().waitFor({ state: 'detached' }).catch(async () => {
+      if (await page.locator('.task-card .task-title', { hasText: new RegExp('^' + title + '$') }).count()) throw new Error('task not deleted');
+    });
+
+    // A yearless date snaps: 1/15 typed in November means next January.
+    await page.getByRole('button', { name: 'Add meeting' }).click();
+    await page.getByPlaceholder('When').fill('1/15');
+    await page.locator('.flex-preview', { hasText: /Jan 15, \d{4}/ }).waitFor();
+    await page.keyboard.press('Escape');
   });
 
   await step('demo client page screenshot', async () => {

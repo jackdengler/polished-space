@@ -130,6 +130,15 @@ describe('sidebar schedule', () => {
   });
 });
 
+describe('tasksAsText', () => {
+  it('formats a paste-ready list', async () => {
+    const { tasksAsText } = await import('./derive');
+    const d = (title: string, tasks: Task[]) => ({ id: title, createdAt: t0, updatedAt: t0, title, tasks });
+    expect(tasksAsText([d('Peer group', [task('Pull proxy data', null, '2026-11-12'), task('Draft slides', null, null)]), d('Empty', [])]))
+      .toBe('Peer group\n11/12 (Thu): Pull proxy data\nTBD: Draft slides');
+  });
+});
+
 describe('schema defaults', () => {
   it('loads files saved before key tasks and kickoffs existed', () => {
     const old = {

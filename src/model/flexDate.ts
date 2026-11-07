@@ -1,4 +1,4 @@
-import { daysInMonth, formatLong, formatNumeric, formatShort, isoDate, isValidYmd, MONTH_SHORT, dayNumber } from './dates';
+import { daysInMonth, formatLong, formatNumeric, formatShort, isoDate, isValidYmd, MONTH_SHORT, dayNumber, parseIso, todayIso } from './dates';
 
 /**
  * A date that is either exact ("10/28/26") or a broader period ("Fall 2026").
@@ -44,8 +44,26 @@ const SEASONS: Record<string, { name: string; from: number; to: number }> = {
 const PART = '(early|mid|late)';
 const YEAR = "('?\\d{2}|\\d{4})";
 
-/** Parse free text into a FlexDate. Returns null if it isn't understood. */
-export function parseFlexDate(input: string): FlexDate | null {
+/** How far back a yearless date may be before it snaps to next year. */
+const SNAP_GRACE_DAYS = 31;
+
+/**
+ * Smart year snapping for dates typed without a year ("11/2", "Mar 3"):
+ * the next occurrence, except dates up to 31 days ago stay in this year.
+ * In November, "11/2" is this year and "1/15" is next January.
+ */
+export function snapYear(month: number, day: number, today: string = todayIso()): FlexDate | null {
+  const { year } = parseIso(today);
+  for (let y = year; y <= year + 4; y++) { // up to 4 years ahead, for Feb 29
+    if (!isValidYmd(y, month, day)) continue; // e.g. Feb 29 only in leap years
+    const iso = isoDate(y, month, day);
+    if (dayNumber(iso) >= dayNumber(today) - SNAP_GRACE_DAYS) return { kind: 'exact', date: iso };
+  }
+  return null;
+}
+
+/** Parse free text into a FlexDate. Returns null if it isn't understood. Yearless dates snap (see snapYear). */
+export function parseFlexDate(input: string, today: string = todayIso()): FlexDate | null {
   const s = input.trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ');
   if (!s) return null;
   let m: RegExpMatchArray | null;
@@ -57,6 +75,15 @@ export function parseFlexDate(input: string): FlexDate | null {
   if ((m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/))) {
     const y = parseYear(m[3]!);
     return y === null ? null : exact(y, +m[1]!, +m[2]!);
+  }
+
+  // 11/2 → snapped to the right year
+  if ((m = s.match(/^(\d{1,2})[/.-](\d{1,2})$/))) return snapYear(+m[1]!, +m[2]!, today);
+
+  // Nov 2, March 3rd → snapped (a bare 1–2 digit number after a month is a day; years need 4 digits or an apostrophe)
+  if ((m = s.match(/^([a-z]+\.?) (\d{1,2})(?:st|nd|rd|th)?$/))) {
+    const mo = monthIndex(m[1]!);
+    if (mo) return snapYear(mo, +m[2]!, today);
   }
 
   // 11/2026
@@ -145,4 +172,4 @@ export function flexToInput(f: FlexDate): string {
   return f.kind === 'exact' ? formatNumeric(f.date) : f.label;
 }
 
-export const FLEX_HINT = 'e.g. 10/28/26, Nov 2026, Q1 2027, Fall 2026, Early 2027';
+export const FLEX_HINT = 'e.g. 11/12, 10/28/26, Nov 2026, Q1 2027, Fall 2026';

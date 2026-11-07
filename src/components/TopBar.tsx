@@ -18,7 +18,7 @@ export function TopBar({ route }: { route: Route }) {
   return (
     <div className="topbar">
       <nav className="crumbs" aria-label="Breadcrumb">
-        {route.weekPage ? <span className="crumb-current">This week</span> : client ? (
+        {route.staffingPage ? <span className="crumb-current">Staffing</span> : route.weekPage ? <span className="crumb-current">This week</span> : client ? (
           <>
             <span className="crumb">Clients</span>
             <span className="crumb-sep">/</span>

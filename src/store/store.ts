@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { produce, type Draft } from 'immer';
 import type { FlexDate } from '../model/flexDate';
-import { ADHOC, emptyWorkspace, type BoardId, type Client, type Deliverable, type Task, type TeamMember, type Workspace } from '../model/schema';
+import { ADHOC, emptyWorkspace, type BoardId, type Client, type Deliverable, type Role, type Task, type TeamMember, type Workspace } from '../model/schema';
+import { cleanName } from '../model/derive';
 import { MEMBER_COLORS } from '../model/derive';
 
 /**
@@ -88,7 +89,7 @@ export interface Store {
 
   // Team
   addMember(name: string): string;
-  updateMember(id: string, patch: { name?: string; color?: string }): void;
+  updateMember(id: string, patch: { name?: string; color?: string; role?: Role }): void;
   deleteMember(id: string): void;
   /** Combine two entries for the same person: `fromId`'s tasks and client teams move to `intoId`. */
   mergeMember(fromId: string, intoId: string): void;
@@ -169,15 +170,16 @@ export const useStore = create<Store>()((set, get) => {
     addMember: (name) => {
       const id = newId();
       mutate((ws) => {
-        ws.teamMembers.push({ id, name: name.trim(), color: MEMBER_COLORS[ws.teamMembers.length % MEMBER_COLORS.length]! });
+        ws.teamMembers.push({ id, name: cleanName(name), color: MEMBER_COLORS[ws.teamMembers.length % MEMBER_COLORS.length]!, role: 'Unassigned' });
       });
       return id;
     },
     updateMember: (id, patch) => mutate((ws) => {
       const m = ws.teamMembers.find((x) => x.id === id);
       if (!m) return;
-      if (patch.name !== undefined) m.name = patch.name.trim();
+      if (patch.name !== undefined) m.name = cleanName(patch.name);
       if (patch.color !== undefined) m.color = patch.color;
+      if (patch.role !== undefined) m.role = patch.role;
     }),
     deleteMember: (id) => mutate((ws) => {
       ws.teamMembers = ws.teamMembers.filter((m) => m.id !== id);

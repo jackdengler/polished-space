@@ -57,6 +57,11 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
           <span className="nav-name">This week</span>
           {myOpen > 0 && <span className="badge" title="Your open tasks due this week or overdue">{myOpen}</span>}
         </a>
+        <a href="#/staffing" className={`nav-item nav-link-row${route.staffingPage ? ' active' : ''}`}
+          onClick={(e) => { e.preventDefault(); go({ staffingPage: true }); }}>
+          <span className="logo-tile icon-tile"><Icon name="users" size={14} /></span>
+          <span className="nav-name">Staffing</span>
+        </a>
 
         <div className="section-label">
           <span>Clients</span>

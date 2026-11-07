@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { MEMBER_COLORS } from '../model/derive';
+import { byRoleThenName, MEMBER_COLORS } from '../model/derive';
+import { ROLES, type Role } from '../model/schema';
 import type { TeamMember } from '../model/schema';
 import { useStore } from '../store/store';
 import { useUi } from '../ui';
@@ -71,16 +72,20 @@ export function TeamSettings() {
 
   if (!open) return null;
   const close = () => useUi.setState({ teamOpen: false });
-  const members = [...ws.teamMembers].sort((a, b) => a.name.localeCompare(b.name));
+  const members = [...ws.teamMembers].sort(byRoleThenName);
 
   return (
-    <Modal title="Team" onClose={close} width={460}>
-      <p className="modal-text">Everyone at the company who can be put on clients and assigned tasks.</p>
+    <Modal title="People" onClose={close} width={560}>
+      <p className="modal-text">Everyone who can be put on clients and assigned tasks. A person's role decides where they appear in staffing.</p>
       <div className="team-list">
-        {members.map((m) => (
-          <div key={m.id} className="team-row">
+        {members.map((m, i) => (<div key={m.id}>
+          {(i === 0 || members[i - 1]!.role !== m.role) && <div className="team-group">{m.role}</div>}
+          <div className="team-row">
             <ColorPicker member={m} />
             <InlineEdit className="grow" value={m.name} label="name" onCommit={(name) => updateMember(m.id, { name })} />
+            <select className="role-select" value={m.role} aria-label={`Role for ${m.name}`} onChange={(e) => updateMember(m.id, { role: e.target.value as Role })}>
+              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
             <span className="muted small">{counts.get(m.id) ?? 0} open</span>
             {members.length > 1 && <MergeButton member={m} others={members.filter((x) => x.id !== m.id)} />}
             <button className="icon-btn" aria-label={`Remove ${m.name}`} title="Remove"
@@ -91,7 +96,7 @@ export function TeamSettings() {
               <Icon name="trash" size={15} />
             </button>
           </div>
-        ))}
+        </div>))}
         {members.length === 0 && !adding && <div className="muted small pad">No one yet.</div>}
         {adding
           ? <AddInput placeholder="Full name, then Enter" onAdd={(n) => addMember(n)} onDone={() => setAdding(false)} />

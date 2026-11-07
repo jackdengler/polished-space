@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { closestCenter, DndContext, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { boardProgress, deliverableProgress, deliverablesComplete, isDeliverableComplete, meetingLabel } from '../model/derive';
+import { boardProgress, deliverableProgress, deliverablesComplete, isDeliverableComplete, meetingLabel, tasksAsText } from '../model/derive';
+import { showToast } from '../ui';
 import { setPrefs, usePrefs } from '../prefs';
 import { ADHOC, type Client, type Deliverable } from '../model/schema';
 import { navigate } from '../router';
@@ -16,6 +17,23 @@ import { Menu } from './Popover';
 import { Checkbox, TaskCard } from './TaskCard';
 import { DatePickButton } from './DatePickButton';
 import { formatDue, formatLong, todayIso } from '../model/dates';
+
+async function copyTasks(deliverables: Deliverable[]) {
+  const text = tasksAsText(deliverables);
+  const n = deliverables.reduce((k, d) => k + d.tasks.length, 0);
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`Copied ${n} task${n === 1 ? '' : 's'}`);
+  } catch {
+    // Older browsers / blocked clipboard: fall back to a hidden textarea.
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    showToast(ok ? `Copied ${n} task${n === 1 ? '' : 's'}` : "Couldn't copy. Your browser blocked the clipboard.");
+  }
+}
 
 /** Indexes are looked up in `ids`, the full list, so reordering works even when some items are hidden. */
 const reorder = (ids: string[], e: DragEndEvent): [number, number] | null => {
@@ -55,7 +73,8 @@ function Column({ d, client, highlightTaskId, hideDone }: { d: Deliverable; clie
               title={open ? 'Collapse this finished deliverable' : 'Show its tasks'}><Icon name="check" size={11} /> {p.done}/{p.total}</button>
           : <span className="column-count">{p.done}/{p.total}</span>}
         <Menu className="icon-btn" button={<Icon name="more" size={15} />} label="Deliverable actions" items={[
-          { label: 'Delete deliverable', danger: true, onSelect: () => void onDelete() },
+          { label: 'Copy tasks', hidden: d.tasks.length === 0, onSelect: () => void copyTasks([d]) },
+          { label: 'Delete deliverable', danger: true, twoStep: d.tasks.length === 0, onSelect: () => void onDelete() },
         ]} />
       </div>
       {collapsed ? (
@@ -139,8 +158,9 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
           <label className="toggle small-toggle"><input type="checkbox" checked={hideDone} onChange={(e) => setPrefs({ hideDoneTasks: e.target.checked })} /> Hide done</label>
           {dp.total > 0 && <span className="bar wide"><span style={{ width: `${(100 * dp.done) / dp.total}%` }} /></span>}
           <span title={`${p.done} of ${p.total} tasks done`}>{dp.done} of {dp.total} deliverable{dp.total === 1 ? '' : 's'} complete</span>
-          {meeting && <Menu className="icon-btn" button={<Icon name="more" size={16} />} label="Meeting actions" items={[
-            { label: 'Delete meeting…', danger: true, onSelect: () => void onDeleteMeeting() },
+          {(meeting || p.total > 0) && <Menu className="icon-btn" button={<Icon name="more" size={16} />} label={meeting ? 'Meeting actions' : 'Ad-hoc actions'} items={[
+            { label: 'Copy all tasks', hidden: p.total === 0, onSelect: () => void copyTasks(deliverables) },
+            { label: 'Delete meeting…', danger: true, hidden: !meeting, onSelect: () => void onDeleteMeeting() },
           ]} />}
         </div>
       </div>

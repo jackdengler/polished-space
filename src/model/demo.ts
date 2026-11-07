@@ -15,10 +15,10 @@ export function makeDemoWorkspace(today: string = todayIso()): Workspace {
   let rand = 7;
   const rnd = () => ((rand = (rand * 16807) % 2147483647) / 2147483647);
 
-  const team: TeamMember[] = [
-    ['Alex Rivera', '#4f46e5'], ['Priya Shah', '#0891b2'], ['Marcus Lee', '#059669'], ['Dana Kim', '#d97706'],
-    ['Sam Ortiz', '#db2777'], ['Taylor Brooks', '#7c3aed'], ['Jordan Ellis', '#2563eb'], ['Riley Chen', '#dc2626'],
-  ].map(([name, color]) => ({ id: id('member'), name: name!, color: color! }));
+  const team: TeamMember[] = ([
+    ['Alex Rivera', '#5b6ea8', 'Principal'], ['Priya Shah', '#4f8a8b', 'Consultant'], ['Marcus Lee', '#6a8f6b', 'Sr Associate'], ['Dana Kim', '#9a7b4f', 'Sr Consultant'],
+    ['Sam Ortiz', '#8c6b8f', 'Associate'], ['Taylor Brooks', '#a06a5f', 'Consultant'], ['Jordan Ellis', '#6f7d93', 'Associate'], ['Riley Chen', '#7d7a55', 'Sr Associate'],
+  ] as const).map(([name, color, role]) => ({ id: id('member'), name, color, role }));
 
   const flex = (text: string): FlexDate => parseFlexDate(text)!;
   const on = (offset: number): FlexDate => ({ kind: 'exact', date: addDays(today, offset) });

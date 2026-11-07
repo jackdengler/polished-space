@@ -5,7 +5,7 @@ import { usePersistence } from '../storage/persistence';
 
 export function Avatar({ member, size = 22 }: { member: TeamMember; size?: number }) {
   return (
-    <span className="avatar" title={member.name} style={{ '--c': member.color, width: size, height: size, fontSize: Math.max(9, size * 0.44) } as CSSProperties}>
+    <span className="avatar" title={member.role === 'Unassigned' ? member.name : `${member.name} · ${member.role}`} style={{ '--c': member.color, width: size, height: size, fontSize: Math.max(9, size * 0.44) } as CSSProperties}>
       {initials(member.name)}
     </span>
   );

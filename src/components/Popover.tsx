@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from './Icon';
 
 /** A floating panel anchored under (or above) an element. Closes on outside click or Esc. */
 export function Popover({ anchor, open, onClose, children, width, align = 'start' }: {
@@ -57,25 +58,42 @@ export function Popover({ anchor, open, onClose, children, width, align = 'start
 }
 
 /** A "⋯" style menu. */
-export interface MenuItem { label: string; onSelect: () => void; danger?: boolean; hidden?: boolean }
+export interface MenuItem {
+  label: string; onSelect: () => void; danger?: boolean; hidden?: boolean;
+  /** Small deletes: the first click arms it ("Click again to delete"), a second within 2s does it. */
+  twoStep?: boolean;
+}
 
 export function Menu({ items, button, label = 'More actions', className = 'icon-btn' }: {
   items: MenuItem[]; button: ReactNode; label?: string; className?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [armed, setArmed] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const close = () => { setOpen(false); setArmed(null); clearTimeout(timer.current); };
+  const pick = (i: MenuItem) => {
+    if (i.twoStep && armed !== i.label) {
+      setArmed(i.label);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setArmed(null), 2000);
+      return;
+    }
+    close();
+    i.onSelect();
+  };
   return (
     <>
       <button ref={ref} className={className} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>
         {button}
       </button>
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={190} align="end">
+      <Popover anchor={ref} open={open} onClose={close} width={190} align="end">
         <div role="menu" className="menu">
           {items.filter((i) => !i.hidden).map((i) => (
-            <button key={i.label} role="menuitem" className={`menu-item${i.danger ? ' danger' : ''}`}
-              onClick={() => { setOpen(false); i.onSelect(); }}>
-              {i.label}
+            <button key={i.label} role="menuitem" className={`menu-item${i.danger ? ' danger' : ''}${armed === i.label ? ' armed' : ''}`}
+              onClick={() => pick(i)}>
+              {armed === i.label ? <><Icon name="trash" size={13} /> Click again to delete</> : i.label}
             </button>
           ))}
         </div>

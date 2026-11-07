@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePrefs } from './prefs';
+import { useUi } from './ui';
 import { ClientPage } from './components/ClientPage';
 import { Icon } from './components/Icon';
 import { ConfirmHost } from './components/Modal';
@@ -8,6 +9,7 @@ import { TeamSettings } from './components/TeamSettings';
 import { Welcome } from './components/Welcome';
 import { TopBar } from './components/TopBar';
 import { WeekPage } from './components/WeekPage';
+import { StaffingPage } from './components/StaffingPage';
 import { WhoAmIModal } from './components/WhoAmI';
 import { navigate, useRoute } from './router';
 import { useStore } from './store/store';
@@ -68,6 +70,11 @@ function useTheme() {
   }, [theme]);
 }
 
+function Toast() {
+  const text = useUi((s) => s.toast);
+  return text ? <div className="toast" role="status">{text}</div> : null;
+}
+
 export function App() {
   useGlobalKeys();
   useTheme();
@@ -79,9 +86,9 @@ export function App() {
 
   // Nothing selected (or the client was deleted) → start on This week.
   useEffect(() => {
-    if (!adapter || client || route.weekPage) return;
+    if (!adapter || client || route.weekPage || route.staffingPage) return;
     navigate({ weekPage: true }, { replace: true });
-  }, [adapter, client, route.weekPage]);
+  }, [adapter, client, route.weekPage, route.staffingPage]);
 
   if (!adapter) return <Welcome />;
 
@@ -93,13 +100,16 @@ export function App() {
         <button className="nav-toggle icon-btn" aria-label="Open navigation" onClick={() => setNavOpen(true)}><Icon name="menu" size={18} /></button>
         <TopBar route={route} />
         <Banners />
-        {route.weekPage
+        {route.staffingPage
+          ? <StaffingPage />
+          : route.weekPage
           ? <WeekPage week={route.week ?? null} />
           : client
           ? <ClientPage key={client.id} client={client} route={route} />
           : <div className="empty-main"><p>No client selected.</p><p className="muted">Add a client with the + in the sidebar.</p></div>}
       </main>
       <TeamSettings />
+      <Toast />
       <WhoAmIModal />
       <ConfirmHost />
     </div>

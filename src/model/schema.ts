@@ -58,10 +58,15 @@ export const ClientSchema = z.object({
   meetings: z.array(MeetingSchema),
 });
 
+export const ROLES = ['Principal', 'Sr Consultant', 'Consultant', 'Sr Associate', 'Associate', 'Unassigned'] as const;
+export type Role = (typeof ROLES)[number];
+
 export const TeamMemberSchema = z.object({
   id: z.string(),
   name: z.string(),
   color: z.string(),
+  /** Seniority, set in the Team list; decides the column a person appears in everywhere. */
+  role: z.enum(ROLES).default('Unassigned'),
 });
 
 export const WorkspaceSchema = z.object({

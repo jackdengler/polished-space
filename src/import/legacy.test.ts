@@ -58,11 +58,19 @@ describe('convertLegacyClients', () => {
   });
 
   it('treats a far-future planned-through as not set, and reuses existing people', () => {
-    const existing = { ...emptyWorkspace(), teamMembers: [{ id: 'm1', name: 'Pat Lee', color: '#000' }] };
+    const existing = { ...emptyWorkspace(), teamMembers: [{ id: 'm1', name: 'Pat Lee', color: '#000', role: 'Principal' as const }] };
     const r = convertLegacyClients([{ name: 'a.json', data: { ...legacy, plannedThrough: '2099-12-31' } }], existing, opts);
     expect(r.clients[0]!.plannedThrough).toBeNull();
     expect(r.clients[0]!.teamMemberIds).toContain('m1');
     expect(r.newMembers.map((m) => m.name)).toEqual(['Sam Fox']);
+  });
+
+  it('takes roles from staffing and strips old (T)/(?) markers, merging those people', () => {
+    const data = { ...legacy, id: 'client_222', staffing: { principal: ['Pat Lee'], consultant: ['Sam Fox (T)'], srAssociate: ['Kim Wu (?)'] }, team: [],
+      meetings: [{ id: 'adhoc', isAdHoc: true, name: '', date: '', deliverables: [{ id: '1', name: 'X', tasks: [{ id: '2', name: 't', assignees: ['Sam Fox'], due: '', complete: false }] }] }], pastMeetings: [] };
+    const r = convertLegacyClients([{ name: 'a.json', data }], emptyWorkspace(), opts);
+    expect(r.newMembers.map((m) => [m.name, m.role])).toEqual([['Pat Lee', 'Principal'], ['Sam Fox', 'Consultant'], ['Kim Wu', 'Sr Associate']]);
+    expect(r.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeId).toBe(r.newMembers[1]!.id);
   });
 
   it('skips files that are not client exports or are already imported', () => {

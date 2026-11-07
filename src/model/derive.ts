@@ -1,6 +1,6 @@
-import { addDays, dayNumber, mondayOf, todayIso } from './dates';
+import { addDays, dayNumber, mondayOf, parseIso, todayIso, weekdayShort } from './dates';
 import { compareFlex, flexEnd, flexStart, formatFlexShort } from './flexDate';
-import type { Client, Deliverable, Meeting, Task, TeamMember } from './schema';
+import { ROLES, type Client, type Deliverable, type Meeting, type Task, type TeamMember } from './schema';
 
 export interface Progress { done: number; total: number }
 
@@ -100,6 +100,32 @@ export function plannedStatus(c: Client, today = todayIso()): { kind: 'passed' |
   if (days < 0) return { kind: 'passed', days: -days };
   if (days <= 30) return { kind: 'soon', days };
   return null;
+}
+
+/**
+ * Paste-ready task list, one block per deliverable:
+ *   Peer group update
+ *   11/12 (Wed): Pull proxy data
+ *   TBD: Draft slides
+ */
+export function tasksAsText(deliverables: Deliverable[]): string {
+  return deliverables
+    .filter((d) => d.tasks.some((t) => t.title.trim()))
+    .map((d) => [d.title, ...d.tasks.filter((t) => t.title.trim()).map((t) => {
+      if (!t.dueDate) return `TBD: ${t.title}`;
+      const { month, day } = parseIso(t.dueDate);
+      return `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')} (${weekdayShort(t.dueDate)}): ${t.title}`;
+    })].join('\n'))
+    .join('\n\n');
+}
+
+/** Seniority order for staffing (Principal first, Unassigned last). */
+export const roleRank = (r: TeamMember['role']) => ROLES.indexOf(r);
+export const byRoleThenName = (a: TeamMember, b: TeamMember) => roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name);
+
+/** People's names without old markers like "(T)", "(t)" or "(?)", and with single spaces. */
+export function cleanName(name: string): string {
+  return name.replace(/\s*\((?:t|\?)\)\s*$/i, '').replace(/\s+/g, ' ').trim();
 }
 
 export function initials(name: string): string {

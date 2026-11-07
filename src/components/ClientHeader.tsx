@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Client } from '../model/schema';
-import { plannedStatus } from '../model/derive';
+import { byRoleThenName, plannedStatus } from '../model/derive';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
 import { usePersistence } from '../storage/persistence';
@@ -19,7 +19,7 @@ export function ClientHeader({ client }: { client: Client }) {
   const teamRef = useRef<HTMLButtonElement>(null);
   const [teamOpen, setTeamOpen] = useState(false);
   const planned = plannedStatus(client);
-  const team = client.teamMemberIds.map((id) => members.find((m) => m.id === id)).filter((m) => m !== undefined);
+  const team = client.teamMemberIds.map((id) => members.find((m) => m.id === id)).filter((m) => m !== undefined).sort(byRoleThenName);
 
   async function onLogo(file: File | undefined) {
     const adapter = usePersistence.getState().adapter;
