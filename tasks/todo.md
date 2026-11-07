@@ -174,3 +174,59 @@ See the chat.
 The same code path is tested via the browser's private file system.
 
 **Next ideas:** import existing client JSONs, meeting templates, My tasks view, server sync.
+
+---
+
+# Weekly Calendar — Plan
+
+Status: **DRAFT — awaiting approval**
+
+## Goal
+One place to see and move this week's work across **all clients**. Top row is my work; bottom row is
+other people's work at my clients.
+
+## Decisions (from the user)
+- **Placement:** its own page, "This week", at the top of the sidebar (above Clients). All clients.
+- **Rows:**
+  - **Meetings band** across the top of each day: meetings with an exact date, at my clients.
+  - **My work:** tasks assigned to me, at any client.
+  - **Others at my clients:** tasks at my clients assigned to someone else, plus unassigned ones (tagged "Unassigned").
+- **Who am I:** picked once from the team list, remembered on this device (not in the shared data). Changeable from the header ("Viewing as Jack Dengler ▾").
+- **My clients** = clients whose team includes me.
+- **Days:** Mon–Fri, with a weekend toggle (remembered on this device). When the weekend is hidden, Sat/Sun items show on Friday with a "Sat"/"Sun" tag.
+- **Overdue column** on the left: open tasks due before the week starts.
+- **Card:** client logo + task name, plus "x/y" if it has subtasks. Hover shows more: client, meeting or ad-hoc, deliverable, assignee, due date, and the subtask list.
+- **Actions:**
+  - Check a task off.
+  - Drag to another day to change its due date. The row is decided by the assignee, so dragging never reassigns.
+  - Drag onto a **"Next week →"** drop zone on the right edge to set the due date to **Monday of next week**.
+  - Click a card or meeting to open it on the client page (task highlighted).
+  - **Add a task on a day:** pick the client, then a meeting or Ad-hoc, then a deliverable. Defaults to Ad-hoc → General. Added in "My work" = assigned to me; added in the bottom row = unassigned.
+
+## Defaults I'll use (say if any is wrong)
+- **Navigation:** header with "Week of Nov 9 – 13", ‹ › to change week, "Today" to jump back. Opens on the current week. The URL remembers the week (`#/week/2026-11-09`).
+- **Overdue column** only appears when viewing the current week. It's a drag source (drag an overdue task onto a day or Next week), not a drop target.
+- **Done tasks** stay on their day, faded with a strikethrough, so the week shows what got done. A "Hide done" toggle is remembered on this device.
+- **Excluded:** archived clients, broad-dated meetings ("Fall 2026" can't sit on one day), and tasks with no due date.
+- **Today's column** gets a subtle highlight.
+- **Within a day:** cards sorted by client name, then deliverable order.
+- **Row headers** show counts ("My work · 7 open").
+- **Empty states:** "Nothing due" on empty days; before "me" is picked, a short prompt to choose yourself.
+- **Hover:** the card is a drag handle (6px threshold) and a click target; the checkbox toggles done; the hover card is read-only.
+
+## Data model
+No schema change. Everything comes from existing fields (`dueDate`, `assigneeId`, `teamMemberIds`, meeting `date`).
+"Me", the weekend toggle and the hide-done toggle live in localStorage (per device).
+New store action: `moveTaskToDate(taskId, isoDate)` (thin wrapper over updateTask, for clarity and future sync), plus the existing `addTask` + `updateTask`.
+
+## Build checklist
+- [ ] Pure `model/week.ts`: week start (Monday), days, task/meeting bucketing (rows, weekend → Friday, overdue) — unit tests
+- [ ] Route `#/week[/<monday>]`; "This week" sidebar item with an open-task badge for me
+- [ ] Week page: header (week label, ‹ Today ›, viewing-as picker, weekend + hide-done toggles)
+- [ ] Grid: Overdue column + day columns × (Meetings band, My work, Others) + "Next week →" drop zone
+- [ ] Task chip: logo, name, x/y; hover card; checkbox; click → client page with highlight
+- [ ] Drag & drop between days / to next week (dnd-kit, one DndContext for the grid)
+- [ ] Add task on a day: popover (client → meeting/Ad-hoc → deliverable → name)
+- [ ] First-run "who are you?" picker
+- [ ] e2e: pick me, check off, drag to a day, push to next week, add task, click through
+- [ ] Screenshot review in light and dark, then republish the hosted page with your data
