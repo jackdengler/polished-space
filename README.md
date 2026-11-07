@@ -33,10 +33,24 @@ The app autosaves shortly after each change. If `workspace.json` changes outside
 (for example, edited on another computer), the app stops and asks which version to keep rather
 than overwriting it.
 
+### Main views
+
+- **Client page:**
+  - Header (logo, team, planned-through).
+  - Meeting timeline: Today line, kickoff flags, ad-hoc due dots.
+  - The selected meeting's deliverable columns, task cards and subtasks.
+- **This week:**
+  - Your work across all clients and your teammates' work at your clients.
+  - Overdue items, plus meetings and kickoffs.
+  - Drag a task to another day or to "Next week", check it off, or add a task on a day.
+- **Key tasks:** star a task to highlight it in gold, for you only.
+
 ### Tips
 
 - **Dates** can be exact (`10/28/26`) or broad (`Nov 2026`, `Q1 2027`, `H2 2026`, `Fall 2026`, `Early 2027`, `Late Nov 2026`, `2026`).
-- **Undo/redo:** Ctrl+Z / Ctrl+Shift+Z.
+- **Undo/redo:** Ctrl+Z / Ctrl+Shift+Z (or the arrows next to the app name).
+- **Workspace menu** (under the app name): Team, Import clients, Theme (System / Light / Dark), and Switch folder.
+- **"Me":** the calendar asks which team member you are once per device.
 - **Reorder:** drag task cards within a column, and drag columns by their ⋮⋮ handle.
 - **Timeline cues:**
   - An amber dot marks a past meeting with open tasks.

@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { usePrefs } from './prefs';
 import { ClientPage } from './components/ClientPage';
 import { Icon } from './components/Icon';
 import { ConfirmHost } from './components/Modal';
@@ -56,8 +57,20 @@ function Banners() {
   return null;
 }
 
+/** Explicit light/dark sets data-theme; "system" leaves it to the OS (or the hosting page). */
+function useTheme() {
+  const theme = usePrefs((s) => s.theme);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'system') { if (root.dataset.appTheme) { delete root.dataset.theme; delete root.dataset.appTheme; } }
+    else { root.dataset.theme = theme; root.dataset.appTheme = '1'; }
+  }, [theme]);
+}
+
 export function App() {
   useGlobalKeys();
+  useTheme();
+  const [navOpen, setNavOpen] = useState(false);
   const adapter = usePersistence((s) => s.adapter);
   const route = useRoute();
   const clients = useStore((s) => s.ws.clients);
@@ -73,9 +86,11 @@ export function App() {
   if (!adapter) return <Welcome />;
 
   return (
-    <div className="app">
-      <Sidebar route={route} />
+    <div className={`app${navOpen ? ' nav-open' : ''}`}>
+      <Sidebar route={route} onNavigate={() => setNavOpen(false)} />
+      <div className="nav-scrim" onClick={() => setNavOpen(false)} />
       <main className="main">
+        <button className="nav-toggle icon-btn" aria-label="Open navigation" onClick={() => setNavOpen(true)}><Icon name="menu" size={18} /></button>
         <Banners />
         {route.weekPage
           ? <WeekPage week={route.week ?? null} />

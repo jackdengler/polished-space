@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { colorFor, initials } from '../model/derive';
 import type { Client, TeamMember } from '../model/schema';
 import { usePersistence } from '../storage/persistence';
 
 export function Avatar({ member, size = 22 }: { member: TeamMember; size?: number }) {
   return (
-    <span className="avatar" title={member.name} style={{ background: member.color, width: size, height: size, fontSize: size * 0.42 }}>
+    <span className="avatar" title={member.name} style={{ '--c': member.color, width: size, height: size, fontSize: Math.max(9, size * 0.44) } as CSSProperties}>
       {initials(member.name)}
     </span>
   );
@@ -38,7 +38,7 @@ export function ClientLogo({ client, size = 28 }: { client: Client; size?: numbe
   if (url) return <img className="client-logo" src={url} alt="" style={{ width: size, height: size }} />;
   return (
     <span className="client-logo fallback" aria-hidden="true"
-      style={{ width: size, height: size, background: colorFor(client.name), fontSize: size * 0.4 }}>
+      style={{ '--c': colorFor(client.name), width: size, height: size, fontSize: Math.max(9, size * 0.4) } as CSSProperties}>
       {initials(client.name)}
     </span>
   );

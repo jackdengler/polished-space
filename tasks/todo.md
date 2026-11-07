@@ -179,7 +179,7 @@ The same code path is tested via the browser's private file system.
 
 # Weekly Calendar — Plan
 
-Status: **DRAFT — awaiting approval**
+Status: **BUILT** (see Review at the end of this section)
 
 ## Goal
 One place to see and move this week's work across **all clients**. Top row is my work; bottom row is
@@ -254,16 +254,68 @@ other people's work at my clients.
   - `moveKickoffToDate(clientId, meetingId, isoDate)`
 
 ## Build checklist
-- [ ] Pure `model/week.ts`: week start (Monday), days, task/meeting bucketing (rows, weekend → Friday, overdue) — unit tests
-- [ ] Route `#/week[/<monday>]`; "This week" sidebar item with an open-task badge for me
-- [ ] Week page: header (week label, ‹ Today ›, viewing-as picker, weekend + hide-done toggles)
-- [ ] Grid: Overdue column + day columns × (Meetings band, My work, Others) + "Next week →" drop zone
-- [ ] Task chip: logo, name, x/y; hover card; checkbox; click → client page with highlight
-- [ ] Drag & drop between days / to next week (dnd-kit, one DndContext for the grid)
-- [ ] Add task on a day: popover (client → meeting/Ad-hoc → deliverable → name)
-- [ ] First-run "who are you?" picker
-- [ ] Key tasks: schema default, toggleKey, star on cards and calendar chips, gold styling (light and dark)
-- [ ] Due dates: weekday format helper (unit-tested), weekend flag on cards and calendar
-- [ ] Kickoff dates: schema default, meeting-header control, calendar chips (check, drag, overdue), timeline flag
-- [ ] e2e: pick me, check off, drag to a day, push to next week, add task, click through
-- [ ] Screenshot review in light and dark, then republish the hosted page with your data
+- [x] Pure `model/week.ts`: week start (Monday), days, task/meeting bucketing (rows, weekend → Friday, overdue) — unit tests
+- [x] Route `#/week[/<monday>]`; "This week" sidebar item with an open-task badge for me
+- [x] Week page: header (week label, ‹ Today ›, viewing-as picker, weekend + hide-done toggles)
+- [x] Grid: Overdue column + day columns × (Meetings band, My work, Others) + "Next week →" drop zone
+- [x] Task chip: logo, name, x/y; hover card; checkbox; click → client page with highlight
+- [x] Drag & drop between days / to next week (dnd-kit, one DndContext for the grid)
+- [x] Add task on a day: popover (client → meeting/Ad-hoc → deliverable → name)
+- [x] First-run "who are you?" picker
+- [x] Key tasks: schema default, toggleKey, star on cards and calendar chips, gold styling (light and dark)
+- [x] Due dates: weekday format helper (unit-tested), weekend flag on cards and calendar
+- [x] Kickoff dates: schema default, meeting-header control, calendar chips (check, drag, overdue), timeline flag
+- [x] e2e: pick me, check off, drag to a day, push to next week, add task, click through
+- [x] Screenshot review in light and dark, then republish the hosted page with your data
+
+## Review — weekly calendar, key tasks, kickoffs, design pass
+
+**Built:**
+- **Weekly calendar:** meetings band, My work, Others at my clients, Overdue (current week), weekend toggle and Friday tags, hide done, drag to a day or to Next week (Monday), check off, hover details, add a task on a day, click through.
+- **Personal key tasks** (gold) on cards and calendar chips.
+- **Kickoff dates:** set from the meeting header; flow to the calendar and the timeline.
+- **Due dates:** weekday shown, plus an amber weekend flag.
+- **Archive and unarchive** from the sidebar.
+- **Logos:** no white box behind them; logos with white baked into the image blend in light mode.
+
+**Design pass (all review notes):**
+- **Scrollbars, contrast, numerals:**
+  - Thin, light scrollbars.
+  - Text grays now ≥ 4.5:1 contrast.
+  - Tabular numerals everywhere.
+  - A 4px spacing scale.
+- **Calmer layers and color:**
+  - No gray fill behind the timeline.
+  - Softer, tinted avatars.
+  - One "selected" style (tinted fill) for clients, meetings and Ad-hoc.
+- **Timeline:**
+  - Header row with "Add meeting" (no pinned gray column).
+  - Legend, darker axis, labels and stems.
+  - The broad-date band is neutral with a tooltip.
+  - Tiles are taller (no clipped letters).
+  - Complete meetings say "All done" (no duplicate check and bar).
+- **Meeting header and columns:**
+  - The meeting name is primary and the date is a secondary pill.
+  - Progress appears only at summary level; columns show a count pill, green when complete.
+  - Column headers are one line at a fixed height, so cards and "Add task" align.
+  - The "Add deliverable" column has a proper minimum height.
+  - Columns grow to use wide screens.
+  - All ⋯ buttons are one size.
+- **Client header:**
+  - Smaller logo, larger avatars with readable initials.
+  - Uppercase labels with dark values ("PLANNED THROUGH Jan 1, 2027").
+- **Sidebar:**
+  - A product mark and name, with undo and redo beside it.
+  - A workspace switcher (browser or folder icon, save status) whose menu holds Team, Import, the theme choice (System / Light / Dark) and Back to start or Switch folder.
+  - Logos in uniform tiles, tighter rows, stronger section labels.
+- **Narrow screens:** the sidebar becomes a drawer below 860px.
+
+**Verified:**
+- 51 unit tests and 17 end-to-end steps, including week drag, push to next week, key star from hover, kickoff and weekend flag.
+- Screenshot reviews with the real data in light and dark, the week page, and narrow widths.
+
+**Bugs found and fixed while testing:**
+- The hover card closed when you pressed its own star (React portal events bubble). Fixed.
+- The test clicked within dnd-kit's 50ms post-drop click guard. That was a test-only problem; a pause was added.
+
+**Not done:** see `tasks/roadmap.md`.

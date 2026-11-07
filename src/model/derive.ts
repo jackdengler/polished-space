@@ -48,7 +48,7 @@ export function initials(name: string): string {
 
 export const memberById = (members: TeamMember[], id: string | null) => (id ? members.find((m) => m.id === id) : undefined);
 
-export const MEMBER_COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#7c3aed', '#2563eb', '#65a30d', '#ea580c'];
+export const MEMBER_COLORS = ['#5b6ea8', '#4f8a8b', '#6a8f6b', '#9a7b4f', '#8c6b8f', '#a06a5f', '#6f7d93', '#7d7a55', '#5f7fa3', '#93705c'];
 
 /** A stable color for a client without a logo, from its name. */
 export function colorFor(text: string): string {

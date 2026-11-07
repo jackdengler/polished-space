@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { convertLegacyClients, type ImportResult } from '../import/legacy';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
@@ -8,9 +8,12 @@ import { imageToPng } from './Avatar';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 
+export interface ImportHandle { open(): void }
+
 /** "Import clients…": reads client JSON files from the previous tracker and adds them. */
-export function ImportClients() {
+export const ImportClients = forwardRef<ImportHandle>(function ImportClients(_props, ref) {
   const input = useRef<HTMLInputElement>(null);
+  useImperativeHandle(ref, () => ({ open: () => input.current?.click() }));
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +54,6 @@ export function ImportClients() {
 
   return (
     <>
-      <button className="side-btn" onClick={() => input.current?.click()}><Icon name="inbox" size={15} /> Import clients…</button>
       <input ref={input} type="file" accept=".json,application/json" multiple hidden aria-label="Client files to import"
         onChange={(e) => { void onFiles(e.target.files); e.target.value = ''; }} />
       {result && (
@@ -80,4 +82,4 @@ export function ImportClients() {
       )}
     </>
   );
-}
+});

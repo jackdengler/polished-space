@@ -44,7 +44,7 @@ export function ClientHeader({ client }: { client: Client }) {
   return (
     <header className="client-header">
       <button className="logo-btn" onClick={() => fileRef.current?.click()} title="Change logo" aria-label="Change logo">
-        <ClientLogo client={client} size={56} />
+        <ClientLogo client={client} size={44} />
         <span className="logo-overlay"><Icon name="image" size={18} /></span>
       </button>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { void onLogo(e.target.files?.[0]); e.target.value = ''; }} />
@@ -55,7 +55,7 @@ export function ClientHeader({ client }: { client: Client }) {
           <div className="meta-item">
             <span className="meta-label">Team</span>
             <div className="team-chips">
-              {team.map((m) => <Avatar key={m.id} member={m} size={24} />)}
+              {team.map((m) => <Avatar key={m.id} member={m} size={26} />)}
               <button ref={teamRef} className="chip-add" onClick={() => setTeamOpen(true)} aria-label="Edit client team" title="Edit team">
                 <Icon name={team.length ? 'plus' : 'users'} size={13} />{team.length === 0 && <span>Add team</span>}
               </button>

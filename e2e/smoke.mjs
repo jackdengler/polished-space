@@ -43,7 +43,7 @@ try {
   await step('opens test storage and starts with demo data', async () => {
     await page.getByRole('button', { name: 'Use test storage' }).click();
     await page.getByRole('button', { name: 'Start with demo data' }).click();
-    await expectText(page.locator('.client-item'), 'Northwind Health');
+    await expectText(page.locator('.nav-item'), 'Northwind Health');
     await page.locator('.tl-tile.selected').waitFor();
     await page.screenshot({ path: 'test-results/demo.png' });
   });
@@ -170,7 +170,7 @@ try {
     ]);
     await page.getByRole('dialog', { name: 'Imported 1 client' }).waitFor();
     await expectText(page.locator('.import-skipped'), 'notes.json');
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Done' }).click();
     await expectText(page.locator('.client-name'), 'Imported Widgets');
     await page.locator('.client-header img.client-logo').waitFor();
     await page.locator('.tl-tile', { hasText: 'Fall 2026' }).waitFor();
@@ -179,19 +179,19 @@ try {
   });
 
   await step('archives and unarchives from the sidebar', async () => {
-    const item = page.locator('.client-item', { hasText: 'Bluebird Logistics' });
+    const item = page.locator('.nav-item', { hasText: 'Bluebird Logistics' });
     await item.hover();
     await item.getByRole('button', { name: 'Archive Bluebird Logistics' }).click();
     await expectText(page.locator('.archived-toggle'), 'Archived (3)');
     await page.locator('.archived-toggle').click();
-    const archived = page.locator('.archived .client-item', { hasText: 'Bluebird Logistics' });
+    const archived = page.locator('.archived .nav-item', { hasText: 'Bluebird Logistics' });
     await archived.hover();
     await archived.getByRole('button', { name: 'Unarchive Bluebird Logistics' }).click();
     await expectText(page.locator('.archived-toggle'), 'Archived (2)');
   });
 
   await step('due dates show the weekday and flag weekends', async () => {
-    await page.locator('.client-item', { hasText: 'Northwind Health' }).locator('.client-link').click();
+    await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
     await page.locator('.tl-adhoc').click();
     const card = page.locator('.task-card', { hasText: 'Request 2026 org chart' });
     await card.locator('input[type=date]').fill(saturdayIso);
@@ -199,7 +199,7 @@ try {
   });
 
   await step('weekly calendar: pick me, add, check off, drag, push to next week', async () => {
-    await page.locator('.week-link').click();
+    await page.locator('.nav-link-row').click();
     await page.getByPlaceholder('Find yourself…').fill('Alex');
     await page.keyboard.press('Enter');
     await page.locator('.week-grid').waitFor();
@@ -247,18 +247,18 @@ try {
   });
 
   await step('kickoff date flows to the calendar and the timeline', async () => {
-    await page.locator('.client-item', { hasText: 'Northwind Health' }).locator('.client-link').click();
+    await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
     await page.locator('.tl-tile', { hasText: 'Leadership readout' }).click();
     const kickDay = addDaysIso(mondayIso, 2);
     await page.locator('.kickoff input[type=date]').fill(kickDay);
     await page.locator('.tl-kickoff').first().waitFor();
-    await page.locator('.week-link').click();
+    await page.locator('.nav-link-row').click();
     await page.locator('.wg-cell .chip.kickoff', { hasText: 'Leadership readout' }).waitFor();
     await page.screenshot({ path: 'test-results/week.png' });
   });
 
   await step('demo client page screenshot', async () => {
-    await page.locator('.client-item', { hasText: 'Northwind Health' }).click();
+    await page.locator('.nav-item', { hasText: 'Northwind Health' }).click();
     await page.locator('.tl-tile.selected').waitFor();
     await page.waitForTimeout(300);
     await page.screenshot({ path: 'test-results/client-page.png' });

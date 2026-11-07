@@ -14,7 +14,7 @@ import { Popover } from './Popover';
 
 const TILE_W = 164;
 const STEM = 14; // the tile's stem sits this far in from its left edge
-const SCALE = { pxPerDay: 3.2, minGap: TILE_W + 14, padStart: STEM + 16, padEnd: 24 };
+const SCALE = { pxPerDay: 2.6, minGap: TILE_W + 12, padStart: STEM + 16, padEnd: 24 };
 
 export function Timeline({ client, boardId }: { client: Client; boardId: string | null }) {
   const members = useStore((s) => s.ws.teamMembers);
@@ -72,7 +72,13 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
   const todayX = scale.x(todayN);
 
   return (
-    <section className="timeline" aria-label="Meetings timeline">
+    <section className="timeline-wrap" aria-label="Meetings timeline">
+    <div className="timeline-head">
+      <span className="section-title">Meetings</span>
+      <span className="legend" aria-hidden="true"><span className="lg-today" />Today<span className="lg-band" />Broad date<span className="lg-dot" />Ad-hoc due</span>
+      <AddMeetingButton client={client} />
+    </div>
+    <div className="timeline">
       <button className={`tl-adhoc${boardId === ADHOC ? ' selected' : ''}`} onClick={() => navigate({ clientId: client.id, boardId: ADHOC })}>
         <span className="tl-adhoc-title"><Icon name="inbox" size={14} /> Ad-hoc</span>
         <span className="tl-adhoc-count">{adhocOpen} open</span>
@@ -94,9 +100,10 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
             return (
               <div key={m.id}>
                 {m.date.kind === 'range' && (
-                  <div className="tl-band" style={{ left: x, width: Math.max(8, scale.x(dayNumber(m.date.end) + 1) - x) }} />
+                  <div className={`tl-band${m.id === boardId ? ' selected' : ''}`} style={{ left: x, width: Math.max(8, scale.x(dayNumber(m.date.end) + 1) - x) }}
+                    title={`${m.date.label}: ${formatFlex(m.date)} spans this period`} />
                 )}
-                <div className={`tl-stem${m.date.kind === 'range' ? ' range' : ''}`} style={{ left: x }} />
+                <div className={`tl-stem${m.date.kind === 'range' ? ' range' : ''}${m.id === boardId ? ' selected' : ''}`} style={{ left: x }} />
                 <button
                   className={`tl-tile${m.id === boardId ? ' selected' : ''}${beyond ? ' beyond' : ''}${past ? ' past' : ''}`}
                   style={{ left: x - STEM, width: TILE_W }}
@@ -105,12 +112,12 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
                   <span className="tl-tile-date">
                     {formatFlexShort(m.date, today)}
                     {openPast && <span className="warn-dot" aria-label="Past meeting with open tasks" />}
-                    {complete && <Icon name="check" size={12} className="done-mark" />}
                   </span>
                   <span className={`tl-tile-title${m.title ? '' : ' derived'}`}>{meetingLabel(m)}</span>
                   <span className="tl-tile-progress">
-                    <span className="bar"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></span>
-                    <span className="count">{p.done}/{p.total}</span>
+                    {complete
+                      ? <span className="all-done"><Icon name="check" size={11} /> All done</span>
+                      : <><span className="bar"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></span><span className="count">{p.done}/{p.total}</span></>}
                   </span>
                 </button>
               </div>
@@ -148,7 +155,7 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
         </div>
       </div>
 
-      <AddMeetingButton client={client} />
+    </div>
     </section>
   );
 }
@@ -169,8 +176,8 @@ function AddMeetingButton({ client }: { client: Client }) {
 
   return (
     <>
-      <button ref={ref} className="tl-add" onClick={() => setOpen(true)} aria-label="Add meeting" title="Add meeting">
-        <Icon name="plus" size={16} /><span>Meeting</span>
+      <button ref={ref} className="btn btn-sm" onClick={() => setOpen(true)} aria-label="Add meeting">
+        <Icon name="plus" size={14} /> Add meeting
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} align="end">
         <form className="form" onSubmit={(e) => { e.preventDefault(); submit(); }}>

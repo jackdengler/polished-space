@@ -4,12 +4,13 @@ import { create } from 'zustand';
  * Per-device preferences, kept in localStorage (not in the shared workspace),
  * so each person sharing a workspace later can be "me" on their own machine.
  */
-interface Prefs { meId: string | null; showWeekend: boolean; hideDone: boolean }
+export type Theme = 'system' | 'light' | 'dark';
+interface Prefs { meId: string | null; showWeekend: boolean; hideDone: boolean; theme: Theme }
 
 const KEY = 'compensian-pm-prefs';
 
 function load(): Prefs {
-  const base: Prefs = { meId: null, showWeekend: false, hideDone: false };
+  const base: Prefs = { meId: null, showWeekend: false, hideDone: false, theme: 'system' };
   try { return { ...base, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return base; }
 }
 

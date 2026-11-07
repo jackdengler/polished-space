@@ -8,7 +8,7 @@ export function InlineEdit({ value, onCommit, placeholder = 'Untitled', classNam
 
   if (draft === null) {
     return (
-      <span className={`inline-edit ${className}${value ? '' : ' placeholder'}`} role="button" tabIndex={0} aria-label={label ? `Edit ${label}` : undefined}
+      <span className={`inline-edit ${className}${value ? '' : ' placeholder'}`} role="button" tabIndex={0} aria-label={label ? `Edit ${label}` : undefined} title={value || undefined}
         onClick={(e) => { e.stopPropagation(); setDraft(value); }}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setDraft(value); } }}>
         {value || placeholder}

@@ -86,7 +86,7 @@ export function WeekPage({ week: weekParam }: { week: string | null }) {
           <div className="week-grid" style={{ gridTemplateColumns: cols }}>
             {/* Header row */}
             <div className="wg-corner" />
-            {week.showOverdue && <div className="wg-dayhead overdue-head">Overdue</div>}
+            {week.showOverdue && <div className="wg-dayhead overdue-head">Overdue <span className="dn">{week.overdueMine.length + week.overdueOthers.length}</span></div>}
             {week.days.map((d) => (
               <div key={d} className={`wg-dayhead${d === today ? ' today' : ''}`}>
                 <span className="wd">{weekdayShort(d)}</span> <span className="dn">{parseIso(d).day}</span>

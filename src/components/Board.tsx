@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { closestCenter, DndContext, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { boardProgress, deliverableProgress } from '../model/derive';
+import { boardProgress, deliverableProgress, meetingLabel } from '../model/derive';
 import { ADHOC, type Client, type Deliverable } from '../model/schema';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
@@ -43,12 +43,11 @@ function Column({ d, client, highlightTaskId }: { d: Deliverable; client: Client
           <Icon name="grip" size={14} />
         </button>
         <InlineEdit className="column-title" value={d.title} label="deliverable" onCommit={(v) => renameDeliverable(d.id, v)} />
-        <span className="column-count">{p.done}/{p.total}</span>
+        <span className={`column-count${p.total > 0 && p.done === p.total ? ' all-done' : ''}`}>{p.done}/{p.total}</span>
         <Menu className="icon-btn" button={<Icon name="more" size={15} />} label="Deliverable actions" items={[
           { label: 'Delete deliverable', danger: true, onSelect: () => void onDelete() },
         ]} />
       </div>
-      <div className="column-bar"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]}
         onDragEnd={(e) => { const r = reorder(ids, e); if (r) moveTask(d.id, ...r); }}>
@@ -92,15 +91,14 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
         <div className="board-title">
           {meeting ? (
             <>
-              <FlexDateInput className="board-date" value={meeting.date} label="meeting date" onChange={(date) => date && updateMeeting(client.id, meeting.id, { date })} />
-              <span className="board-sep">·</span>
-              <InlineEdit className="board-name" value={meeting.title} placeholder="Add a title" label="meeting title"
+              <InlineEdit className="board-name" value={meeting.title} placeholder={meetingLabel({ ...meeting, title: '' })} label="meeting title"
                 onCommit={(title) => updateMeeting(client.id, meeting.id, { title })} />
+              <FlexDateInput className="board-date" value={meeting.date} label="meeting date" onChange={(date) => date && updateMeeting(client.id, meeting.id, { date })} />
             </>
           ) : (
             <>
               <span className="board-name static">Ad-hoc</span>
-              <span className="muted">Client work not tied to a meeting</span>
+              <span className="board-sub">Work not tied to a meeting</span>
             </>
           )}
         </div>
@@ -119,8 +117,8 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
           </div>
         )}
         <div className="board-progress">
-          <span className="bar wide"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></span>
-          <span>{p.done} of {p.total} done</span>
+          {p.total > 0 && p.done < p.total && <span className="bar wide"><span style={{ width: `${(100 * p.done) / p.total}%` }} /></span>}
+          <span className={p.total > 0 && p.done === p.total ? 'all-done' : ''}>{p.total > 0 && p.done === p.total ? <><Icon name="check" size={13} /> All {p.total} done</> : `${p.done}/${p.total} done`}</span>
           {meeting && <Menu className="icon-btn" button={<Icon name="more" size={16} />} label="Meeting actions" items={[
             { label: 'Delete meeting…', danger: true, onSelect: () => void onDeleteMeeting() },
           ]} />}
