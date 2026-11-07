@@ -391,7 +391,7 @@ img.client-logo { mix-blend-mode: var(--logo-blend); }
 .tl-tile-date { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-muted); }
 .tl-tile-title { font-weight: 650; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; padding-bottom: 1px; }
 .tl-tile-title.derived { font-weight: 550; }
-.tl-tile-progress { font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
+.tl-tile-progress { font-size: 11.5px; color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-tile-progress.complete { color: var(--success); }
 .warn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
 .tl-dot { position: absolute; top: 108px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--text-muted); border: 2px solid var(--card); box-sizing: content-box; }

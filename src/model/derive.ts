@@ -16,6 +16,15 @@ export function boardProgress(deliverables: Deliverable[]): Progress {
   }, { done: 0, total: 0 });
 }
 
+/** A deliverable is complete when it has tasks and all of them are done. */
+export const isDeliverableComplete = (d: Deliverable) => d.tasks.length > 0 && d.tasks.every((t) => t.done);
+
+/** Deliverables complete out of all deliverables on a board. */
+export const deliverablesComplete = (deliverables: Deliverable[]): Progress => ({
+  done: deliverables.filter(isDeliverableComplete).length,
+  total: deliverables.length,
+});
+
 export const isOverdue = (t: Task, today = todayIso()) => !t.done && t.dueDate !== null && dayNumber(t.dueDate) < dayNumber(today);
 
 export const allTasks = (deliverables: Deliverable[]) => deliverables.flatMap((d) => d.tasks);

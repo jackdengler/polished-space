@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { closestCenter, DndContext, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { boardProgress, deliverableProgress, meetingLabel } from '../model/derive';
+import { boardProgress, deliverableProgress, deliverablesComplete, meetingLabel } from '../model/derive';
 import { ADHOC, type Client, type Deliverable } from '../model/schema';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
@@ -74,6 +74,7 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
   const deliverables = meeting ? meeting.deliverables : client.adhoc.deliverables;
   const ids = deliverables.map((d) => d.id);
   const p = boardProgress(deliverables);
+  const dp = deliverablesComplete(deliverables);
 
   const onDeleteMeeting = async () => {
     if (!meeting) return;
@@ -119,8 +120,8 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
           )}
         </div>
         <div className="board-progress">
-          {p.total > 0 && <span className="bar wide"><span style={{ width: `${(100 * p.done) / p.total}%` }} /></span>}
-          <span>{p.done} of {p.total} tasks done</span>
+          {dp.total > 0 && <span className="bar wide"><span style={{ width: `${(100 * dp.done) / dp.total}%` }} /></span>}
+          <span title={`${p.done} of ${p.total} tasks done`}>{dp.done} of {dp.total} deliverable{dp.total === 1 ? '' : 's'} complete</span>
           {meeting && <Menu className="icon-btn" button={<Icon name="more" size={16} />} label="Meeting actions" items={[
             { label: 'Delete meeting…', danger: true, onSelect: () => void onDeleteMeeting() },
           ]} />}

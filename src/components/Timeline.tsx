@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { dayNumber, formatDue, fromDayNumber, MONTH_SHORT, parseIso, todayIso } from '../model/dates';
 import {
-  allTasks, boardProgress, isAfterPlannedThrough, isOverdue, isPastMeeting, meetingLabel, memberById, sortedMeetings,
+  allTasks, boardProgress, deliverablesComplete, isAfterPlannedThrough, isOverdue, isPastMeeting, meetingLabel, memberById, sortedMeetings,
 } from '../model/derive';
 import { formatFlex, formatFlexShort, flexEnd, flexStart, parseFlexDate } from '../model/flexDate';
 import { ADHOC, type Client } from '../model/schema';
@@ -90,10 +90,11 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
           {meetings.map((m, i) => {
             const x = scale.tileX(i);
             const p = boardProgress(m.deliverables);
+            const dp = deliverablesComplete(m.deliverables);
             const past = isPastMeeting(m, today);
             const openPast = past && p.done < p.total;
             const beyond = isAfterPlannedThrough(m, client);
-            const complete = p.total > 0 && p.done === p.total;
+            const complete = dp.total > 0 && dp.done === dp.total;
             return (
               <div key={m.id}>
                 {m.date.kind === 'range' && (
@@ -111,7 +112,9 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
                     {openPast && <span className="warn-dot" aria-label="Past meeting with open tasks" />}
                   </span>
                   <span className={`tl-tile-title${m.title ? '' : ' derived'}`}>{meetingLabel(m, today)}</span>
-                  <span className={`tl-tile-progress${complete ? ' complete' : ''}`}>{p.total ? `${p.done}/${p.total} complete` : 'No tasks yet'}</span>
+                  <span className={`tl-tile-progress${complete ? ' complete' : ''}`} title={`${dp.done} of ${dp.total} deliverables complete · ${p.done} of ${p.total} tasks done`}>
+                    {dp.total ? `${dp.done}/${dp.total} deliverable${dp.total === 1 ? '' : 's'}` : 'No deliverables yet'}
+                  </span>
                 </button>
               </div>
             );

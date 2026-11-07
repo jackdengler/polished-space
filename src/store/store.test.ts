@@ -112,6 +112,21 @@ describe('key tasks and kickoffs', () => {
   });
 });
 
+describe('deliverables complete', () => {
+  it('counts a deliverable as complete only when it has tasks and all are done', async () => {
+    const { deliverablesComplete } = await import('../model/derive');
+    const c = s().addClient('Acme');
+    const m = s().addMeeting(c, parseFlexDate('12/1/26')!, 'Readout');
+    const d1 = s().addDeliverable(c, m, 'Done one');
+    s().addDeliverable(c, m, 'Empty');
+    const d3 = s().addDeliverable(c, m, 'Half');
+    s().toggleTask(s().addTask(d1, 'a'));
+    s().toggleTask(s().addTask(d3, 'b'));
+    s().addTask(d3, 'c');
+    expect(deliverablesComplete(s().ws.clients[0]!.meetings[0]!.deliverables)).toEqual({ done: 1, total: 3 });
+  });
+});
+
 describe('demo data', () => {
   it('is a valid workspace', () => {
     const ws = makeDemoWorkspace('2026-11-07');
