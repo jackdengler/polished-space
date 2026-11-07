@@ -88,6 +88,8 @@ export interface Store {
   addMember(name: string): string;
   updateMember(id: string, patch: { name?: string; color?: string }): void;
   deleteMember(id: string): void;
+  /** Combine two entries for the same person: `fromId`'s tasks and client teams move to `intoId`. */
+  mergeMember(fromId: string, intoId: string): void;
 
   // Clients
   /** Add imported clients and any new team members in one step. */
@@ -175,6 +177,17 @@ export const useStore = create<Store>()((set, get) => {
     importClients: (clients, newMembers) => mutate((ws) => {
       ws.teamMembers.push(...newMembers);
       ws.clients.push(...clients);
+    }),
+
+    mergeMember: (fromId, intoId) => mutate((ws) => {
+      if (fromId === intoId || !ws.teamMembers.some((m) => m.id === intoId)) return;
+      ws.teamMembers = ws.teamMembers.filter((m) => m.id !== fromId);
+      for (const c of ws.clients) {
+        if (c.teamMemberIds.includes(fromId)) {
+          c.teamMemberIds = [...new Set(c.teamMemberIds.map((x) => (x === fromId ? intoId : x)))];
+        }
+      }
+      for (const { d } of allDeliverables(ws)) for (const t of d.tasks) if (t.assigneeId === fromId) { t.assigneeId = intoId; touch(t); }
     }),
 
     addClient: (name) => {

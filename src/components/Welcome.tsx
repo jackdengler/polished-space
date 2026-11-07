@@ -5,6 +5,7 @@ import { FolderAdapter } from '../storage/folderAdapter';
 import { forgetFolder, getSavedFolder, saveFolder } from '../storage/handleStore';
 import { clearSavedBrowserWorkspace, loadSavedBrowserWorkspace, MemoryAdapter } from '../storage/memoryAdapter';
 import { confirmDialog, ConfirmHost } from './Modal';
+import { readSeed } from '../seed';
 import { attach, flush } from '../storage/persistence';
 import { Icon } from './Icon';
 
@@ -12,6 +13,7 @@ import { Icon } from './Icon';
 const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
 const supported = typeof window.showDirectoryPicker === 'function' && !embedded;
 const BROWSER_KEY = 'compensian-pm-demo';
+const seed = readSeed();
 /** `?storage=opfs` uses the browser's private file system instead of a picked folder (for automated tests). */
 const testStorage = new URLSearchParams(location.search).get('storage') === 'opfs';
 
@@ -22,7 +24,7 @@ export function Welcome() {
   const [busy, setBusy] = useState(false);
   const [browserWs, setBrowserWs] = useState(() => loadSavedBrowserWorkspace(BROWSER_KEY));
   const startInBrowser = (ws: Workspace) => {
-    const adapter = new MemoryAdapter(ws, BROWSER_KEY);
+    const adapter = new MemoryAdapter(ws, BROWSER_KEY, seed?.logos);
     attach(adapter, ws);
     void flush();
   };
@@ -108,12 +110,30 @@ export function Welcome() {
           </button>
         )}
         {browserWs ? (
-          <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startInBrowser(browserWs)}>
-            Continue in this browser ({browserWs.clients.length} client{browserWs.clients.length === 1 ? '' : 's'})
-          </button>
+          <>
+            <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startInBrowser(browserWs)}>
+              Continue in this browser ({browserWs.clients.length} client{browserWs.clients.length === 1 ? '' : 's'})
+            </button>
+            {seed && (
+              <button className="btn btn-lg" onClick={async () => {
+                if (await confirmDialog({
+                  title: `Load my ${seed.workspace.clients.length} clients?`,
+                  message: 'This replaces what this browser has saved (including any changes you made here).',
+                  confirmLabel: 'Load my clients', danger: true,
+                })) startInBrowser(seed.workspace);
+              }}>
+                Load my {seed.workspace.clients.length} clients
+              </button>
+            )}
+          </>
         ) : (
           <>
-            <button className={`btn btn-lg${supported || testStorage ? '' : ' btn-primary'}`} onClick={() => startInBrowser(makeDemoWorkspace())}>Try the demo</button>
+            {seed && (
+              <button className="btn btn-lg btn-primary" onClick={() => startInBrowser(seed.workspace)}>
+                Open my clients ({seed.workspace.clients.length})
+              </button>
+            )}
+            <button className={`btn btn-lg${supported || testStorage || seed ? '' : ' btn-primary'}`} onClick={() => startInBrowser(makeDemoWorkspace())}>Try the demo</button>
             <button className="btn btn-lg" onClick={() => startInBrowser(emptyWorkspace())}>Start empty in this browser</button>
           </>
         )}
@@ -124,13 +144,13 @@ export function Welcome() {
       {!supported && !testStorage && (
         <p className="welcome-note">
           {embedded
-            ? 'This preview can try the demo only. To save real data to a folder, open the full app in Chrome or Edge.'
+            ? 'Here, your work is saved in this browser. To save to a folder (e.g. OneDrive), open the full app in Chrome or Edge.'
             : "This browser can't save to a folder. Open the app in Chrome or Edge, or try the demo."}
         </p>
       )}
       <p className="welcome-fine">
         {supported ? 'Your data stays in the folder you choose (OneDrive is fine). Nothing is uploaded. ' : ''}
-        The demo uses fictional sample data. Browser workspaces are saved only in this browser; import your client files from the sidebar.
+        The demo uses fictional sample data. You can import more client files from the sidebar.
       </p>
       <ConfirmHost />
     </Shell>

@@ -11,7 +11,8 @@ export class MemoryAdapter implements StorageAdapter {
   readonly kind = 'memory' as const;
   readonly name = 'This browser';
   private logos = new Map<string, Blob>();
-  constructor(private ws: Workspace | null = null, private storageKey?: string) {}
+  /** `builtInLogos`: logo data URLs shipped with the page (file name → data URL). */
+  constructor(private ws: Workspace | null = null, private storageKey?: string, private builtInLogos: Record<string, string> = {}) {}
 
   async load() { return this.ws; }
 
@@ -29,13 +30,12 @@ export class MemoryAdapter implements StorageAdapter {
 
   async readLogo(name: string) {
     const hit = this.logos.get(name);
-    if (hit || !this.storageKey) return hit ?? null;
-    try {
-      const url = localStorage.getItem(`${this.storageKey}:logo:${name}`);
-      return url ? dataUrlToBlob(url) : null;
-    } catch {
-      return null;
+    if (hit) return hit;
+    let url: string | null | undefined = this.builtInLogos[name];
+    if (!url && this.storageKey) {
+      try { url = localStorage.getItem(`${this.storageKey}:logo:${name}`); } catch { url = null; }
     }
+    return url ? dataUrlToBlob(url) : null;
   }
 }
 

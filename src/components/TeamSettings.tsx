@@ -30,6 +30,47 @@ function ColorPicker({ member }: { member: TeamMember }) {
   );
 }
 
+/** Pick another person to merge this one into. */
+function MergeButton({ member, others }: { member: TeamMember; others: TeamMember[] }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const shown = others.filter((m) => m.name.toLowerCase().includes(q.trim().toLowerCase()));
+  // Suggest likely matches first: same first word (e.g. "Dom" → "Dominik Arbet").
+  const first = member.name.split(/[\s.(]/)[0]!.toLowerCase();
+  const likely = (m: TeamMember) => first.length >= 2 && m.name.toLowerCase().startsWith(first);
+  const sorted = [...shown].sort((a, b) => Number(likely(b)) - Number(likely(a)));
+  const merge = async (into: TeamMember) => {
+    setOpen(false);
+    if (await confirmDialog({
+      title: `Merge “${member.name}” into “${into.name}”?`,
+      message: `${member.name}'s tasks and client teams move to ${into.name}, and “${member.name}” is removed. You can undo this.`,
+      confirmLabel: 'Merge',
+    })) useStore.getState().mergeMember(member.id, into.id);
+  };
+  return (
+    <>
+      <button ref={ref} className="btn btn-sm btn-ghost" onClick={() => setOpen(true)}>Merge into…</button>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240} align="end">
+        <div className="picker">
+          <div className="picker-search">
+            <Icon name="search" size={14} />
+            <input autoFocus value={q} placeholder="Same person as…" aria-label="Merge into" onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="picker-list">
+            {sorted.map((m) => (
+              <button key={m.id} className="picker-row" onClick={() => void merge(m)}>
+                <Avatar member={m} size={20} /> <span className="grow">{m.name}</span>
+              </button>
+            ))}
+            {sorted.length === 0 && <div className="picker-empty">No one matches.</div>}
+          </div>
+        </div>
+      </Popover>
+    </>
+  );
+}
+
 export function TeamSettings() {
   const open = useUi((s) => s.teamOpen);
   const ws = useStore((s) => s.ws);
@@ -56,6 +97,7 @@ export function TeamSettings() {
             <ColorPicker member={m} />
             <InlineEdit className="grow" value={m.name} label="name" onCommit={(name) => updateMember(m.id, { name })} />
             <span className="muted small">{counts.get(m.id) ?? 0} open</span>
+            {members.length > 1 && <MergeButton member={m} others={members.filter((x) => x.id !== m.id)} />}
             <button className="icon-btn" aria-label={`Remove ${m.name}`} title="Remove"
               onClick={async () => {
                 if (await confirmDialog({ title: `Remove ${m.name}?`, message: 'They will be taken off all clients and their tasks will become unassigned.', confirmLabel: 'Remove', danger: true }))

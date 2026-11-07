@@ -66,6 +66,23 @@ describe('store actions', () => {
   });
 });
 
+describe('mergeMember', () => {
+  it('moves tasks and client teams to the kept person', () => {
+    const dom = s().addMember('Dom');
+    const full = s().addMember('Dominik Arbet');
+    const c = s().addClient('Acme');
+    s().toggleClientMember(c, dom);
+    s().toggleClientMember(c, full);
+    const d = s().ws.clients[0]!.adhoc.deliverables[0]!.id;
+    const t = s().addTask(d, 'Call');
+    s().updateTask(t, { assigneeId: dom });
+    s().mergeMember(dom, full);
+    expect(s().ws.teamMembers.map((m) => m.name)).toEqual(['Dominik Arbet']);
+    expect(s().ws.clients[0]!.teamMemberIds).toEqual([full]);
+    expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeId).toBe(full);
+  });
+});
+
 describe('demo data', () => {
   it('is a valid workspace', () => {
     const ws = makeDemoWorkspace('2026-11-07');
