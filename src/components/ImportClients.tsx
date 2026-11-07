@@ -6,7 +6,10 @@ import { dataUrlToBlob } from '../storage/blobs';
 import { usePersistence } from '../storage/persistence';
 import { imageToPng } from './Avatar';
 import { Icon } from './Icon';
-import { Modal } from './Modal';
+import { confirmDialog, Modal } from './Modal';
+import { parseWorkspace } from '../model/schema';
+
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
 
 export interface ImportHandle { open(): void }
 
@@ -27,6 +30,24 @@ export const ImportClients = forwardRef<ImportHandle>(function ImportClients(_pr
       catch { unreadable.push({ file: f.name, reason: "isn't valid JSON" }); }
     }
     const store = useStore.getState();
+
+    // A backup exported from this app: offer to restore it (replaces everything, undoable).
+    const backup = files.find((f) => obj(f.data).schemaVersion !== undefined);
+    if (backup) {
+      try {
+        const ws = parseWorkspace(backup.data);
+        if (await confirmDialog({
+          title: 'Restore this backup?',
+          message: `“${backup.name}” has ${ws.clients.length} clients and ${ws.teamMembers.length} people. Restoring replaces everything here. You can undo right after.`,
+          confirmLabel: 'Restore backup', danger: true,
+        })) store.replaceAll(ws);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        setResult({ clients: [], newMembers: [], logos: [], summary: [], skipped: [{ file: backup.name, reason: 'is not a valid backup' }] });
+      }
+      return;
+    }
+
     const r = convertLegacyClients(files, store.ws);
     r.skipped.unshift(...unreadable);
 

@@ -32,7 +32,7 @@ function AssigneeButton({ task, client }: { task: Task; client: Client }) {
     <>
       <button ref={ref} className={`meta-btn${who ? '' : ' empty'}`} onClick={() => setOpen(true)}
         aria-label={who ? `Assigned to ${who.name}. Change` : 'Assign'} title={who ? who.name : 'Assign'}>
-        {who ? <><Avatar member={who} size={18} /><span>{who.name.split(' ')[0]}</span></> : <><Icon name="users" size={13} /><span>Assign</span></>}
+        {who ? <><Avatar member={who} size={18} /><span>{who.name.split(' ')[0]}</span></> : <><span className="avatar-empty" /><span>Unassigned</span></>}
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240}>
         <MemberPicker client={client} value={task.assigneeId}
@@ -52,7 +52,7 @@ export function DueButton({ task }: { task: Task }) {
     <DatePickButton id={task.id} value={task.dueDate} label={task.dueDate ? `Due ${formatDue(task.dueDate, today)}. Change` : 'Set due date'} title={tip}
       className={`meta-btn${task.dueDate ? '' : ' empty'}${overdue ? ' overdue' : ''}${weekend ? ' weekend' : ''}`}
       onChange={(v) => useStore.getState().updateTask(task.id, { dueDate: v })}>
-      <Icon name={weekend ? 'alert' : 'calendar'} size={13} /><span>{task.dueDate ? formatDue(task.dueDate, today) : 'Due'}</span>
+      <Icon name={weekend ? 'alert' : 'calendar'} size={13} /><span>{task.dueDate ? formatDue(task.dueDate, today) : 'No date'}</span>
     </DatePickButton>
   );
 }

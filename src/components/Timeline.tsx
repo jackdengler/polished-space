@@ -12,7 +12,7 @@ import { FlexDateField } from './FlexDateInput';
 import { Icon } from './Icon';
 import { Popover } from './Popover';
 
-const TILE_W = 164;
+const TILE_W = 150;
 const STEM = 14; // the tile's stem sits this far in from its left edge
 const SCALE = { pxPerDay: 2.6, minGap: TILE_W + 12, padStart: STEM + 16, padEnd: 24 };
 
@@ -51,8 +51,7 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
       const day = dayNumber(`${y}-${String(m).padStart(2, '0')}-01`);
       if (day > scale.endDay) break;
       const x = scale.x(day);
-      // Skip a month label that would sit on the "Today" label.
-      if (x - lastX > 46 && Math.abs(x - scale.x(todayN)) > 44) {
+      if (x - lastX > 46) {
         out.push({ x, label: m === 1 || out.length === 0 ? `${MONTH_SHORT[m - 1]} ${y}` : MONTH_SHORT[m - 1]! });
         lastX = x;
       }
@@ -72,23 +71,21 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
   const todayX = scale.x(todayN);
 
   return (
-    <section className="timeline-wrap" aria-label="Meetings timeline">
-    <div className="timeline-head">
-      <span className="section-title">Meetings</span>
-      <span className="legend" aria-hidden="true"><span className="lg-today" />Today<span className="lg-band" />Broad date<span className="lg-dot" />Ad-hoc due</span>
-      <AddMeetingButton client={client} />
-    </div>
-    <div className="timeline">
-      <button className={`tl-adhoc${boardId === ADHOC ? ' selected' : ''}`} onClick={() => navigate({ clientId: client.id, boardId: ADHOC })}>
-        <span className="tl-adhoc-title"><Icon name="inbox" size={14} /> Ad-hoc</span>
-        <span className="tl-adhoc-count">{adhocOpen} open</span>
-        {adhocOverdue > 0 && <span className="tl-adhoc-overdue">{adhocOverdue} overdue</span>}
-      </button>
+    <section className="meetings-card" aria-label="Meetings">
+      <div className="meetings-head">
+        <h2 className="meetings-title">Meetings</h2>
+        <button className={`adhoc-pill${boardId === ADHOC ? ' selected' : ''}`} onClick={() => navigate({ clientId: client.id, boardId: ADHOC })}
+          title="Client work not tied to a meeting">
+          <Icon name="inbox" size={13} /> Ad-hoc · {adhocOpen} open
+          {adhocOverdue > 0 && <span className="pill-overdue">· {adhocOverdue} overdue</span>}
+        </button>
+        <AddMeetingButton client={client} />
+      </div>
 
       <div className="tl-scroll" ref={scroller}>
         <div className="tl-canvas" style={{ width: scale.width }}>
-          {plannedX !== null && <div className="tl-beyond" style={{ left: plannedX }} title="After planned-through" />}
-          <div className="tl-today" style={{ left: todayX }}><span>Today</span></div>
+          {plannedX !== null && <div className="tl-beyond" style={{ left: plannedX }} title={`After planned-through (${formatFlex(client.plannedThrough!)})`} />}
+          <div className="tl-today" style={{ left: todayX }} title="Today" />
 
           {meetings.map((m, i) => {
             const x = scale.tileX(i);
@@ -101,34 +98,31 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
               <div key={m.id}>
                 {m.date.kind === 'range' && (
                   <div className={`tl-band${m.id === boardId ? ' selected' : ''}`} style={{ left: x, width: Math.max(8, scale.x(dayNumber(m.date.end) + 1) - x) }}
-                    title={`${m.date.label}: ${formatFlex(m.date)} spans this period`} />
+                    title={`${m.date.label} spans this period`} />
                 )}
-                <div className={`tl-stem${m.date.kind === 'range' ? ' range' : ''}${m.id === boardId ? ' selected' : ''}`} style={{ left: x }} />
+                <div className={`tl-stem${m.id === boardId ? ' selected' : ''}`} style={{ left: x }} />
                 <button
                   className={`tl-tile${m.id === boardId ? ' selected' : ''}${beyond ? ' beyond' : ''}${past ? ' past' : ''}`}
                   style={{ left: x - STEM, width: TILE_W }}
-                  title={`${formatFlex(m.date)}${m.title ? ` · ${m.title}` : ''}${openPast ? ' · past meeting with open tasks' : ''}${beyond ? ' · after planned-through' : ''}`}
+                  title={`${formatFlex(m.date)} · ${meetingLabel(m, today)}${openPast ? ' · past meeting with open tasks' : ''}${beyond ? ' · after planned-through' : ''}`}
                   onClick={() => navigate({ clientId: client.id, boardId: m.id })}>
                   <span className="tl-tile-date">
                     {formatFlexShort(m.date, today)}
                     {openPast && <span className="warn-dot" aria-label="Past meeting with open tasks" />}
                   </span>
-                  <span className={`tl-tile-title${m.title ? '' : ' derived'}`}>{meetingLabel(m)}</span>
-                  <span className="tl-tile-progress">
-                    {complete
-                      ? <span className="all-done"><Icon name="check" size={11} /> All done</span>
-                      : <><span className="bar"><span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} /></span><span className="count">{p.done}/{p.total}</span></>}
-                  </span>
+                  <span className={`tl-tile-title${m.title ? '' : ' derived'}`}>{meetingLabel(m, today)}</span>
+                  <span className={`tl-tile-progress${complete ? ' complete' : ''}`}>{p.total ? `${p.done}/${p.total} complete` : 'No tasks yet'}</span>
                 </button>
               </div>
             );
           })}
 
           <div className="tl-axis" />
+          <div className="tl-today-dot" style={{ left: todayX }} />
           {ticks.map((t) => <div key={t.x} className="tl-tick" style={{ left: t.x }}><span>{t.label}</span></div>)}
           {plannedX !== null && (
             <div className="tl-planned" style={{ left: plannedX }} title={`Planned through ${formatFlex(client.plannedThrough!)}`}>
-              <Icon name="flag" size={12} /><span>Planned thru {formatFlexShort(client.plannedThrough!, today)}</span>
+              <Icon name="flag" size={11} /><span>Planned thru {formatFlexShort(client.plannedThrough!, today)}</span>
             </div>
           )}
 
@@ -151,11 +145,9 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
             </button>
           ))}
 
-          {meetings.length === 0 && <div className="tl-empty">No meetings yet — add the first one.</div>}
+          {meetings.length === 0 && <div className="tl-empty">No meetings yet. Add the first one with “+ Meeting”.</div>}
         </div>
       </div>
-
-    </div>
     </section>
   );
 }
@@ -176,8 +168,8 @@ function AddMeetingButton({ client }: { client: Client }) {
 
   return (
     <>
-      <button ref={ref} className="btn btn-sm" onClick={() => setOpen(true)} aria-label="Add meeting">
-        <Icon name="plus" size={14} /> Add meeting
+      <button ref={ref} className="btn btn-sm btn-soft" onClick={() => setOpen(true)} aria-label="Add meeting">
+        <Icon name="plus" size={13} /> Meeting
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} align="end">
         <form className="form" onSubmit={(e) => { e.preventDefault(); submit(); }}>

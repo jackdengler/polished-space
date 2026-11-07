@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { closestCenter, DndContext, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { horizontalListSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { boardProgress, deliverableProgress, meetingLabel } from '../model/derive';
 import { ADHOC, type Client, type Deliverable } from '../model/schema';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
-import { horizontalOnly, sensorOptions, SmartPointerSensor, verticalOnly } from './dnd';
+import { sensorOptions, SmartPointerSensor, verticalOnly } from './dnd';
 import { FlexDateInput } from './FlexDateInput';
 import { Icon } from './Icon';
 import { AddInput, InlineEdit } from './InlineEdit';
@@ -88,37 +88,39 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
   return (
     <section className="board" aria-label={meeting ? 'Meeting' : 'Ad-hoc work'}>
       <div className="board-head">
-        <div className="board-title">
+        <div className="board-heading">
           {meeting ? (
             <>
-              <InlineEdit className="board-name" value={meeting.title} placeholder={meetingLabel({ ...meeting, title: '' })} label="meeting title"
-                onCommit={(title) => updateMeeting(client.id, meeting.id, { title })} />
-              <FlexDateInput className="board-date" value={meeting.date} label="meeting date" onChange={(date) => date && updateMeeting(client.id, meeting.id, { date })} />
+              <h2 className="board-name"><InlineEdit value={meeting.title} placeholder={meetingLabel({ ...meeting, title: '' })} label="meeting title"
+                onCommit={(title) => updateMeeting(client.id, meeting.id, { title })} /></h2>
+              <div className="board-sub">
+                <FlexDateInput className="sub-date" value={meeting.date} label="meeting date" onChange={(date) => date && updateMeeting(client.id, meeting.id, { date })} />
+                <span>· {deliverables.length} deliverable{deliverables.length === 1 ? '' : 's'}</span>
+                <span>·</span>
+                <span className={`kickoff${meeting.kickoff?.done ? ' done' : ''}`}>
+                  {meeting.kickoff && (
+                    <Checkbox small checked={meeting.kickoff.done} label={meeting.kickoff.done ? 'Kickoff done. Undo' : 'Mark kickoff done'}
+                      onToggle={() => useStore.getState().toggleKickoffDone(client.id, meeting.id)} />
+                  )}
+                  <DatePickButton id={`kickoff-${meeting.id}`} value={meeting.kickoff?.date ?? null} label="Kickoff date"
+                    title={meeting.kickoff ? `Kickoff ${formatLong(meeting.kickoff.date)}: work on this meeting starts. Shows on the weekly calendar.` : 'When work on this meeting should start. Shows on the weekly calendar.'}
+                    className={`kickoff-link${meeting.kickoff ? '' : ' empty'}`}
+                    onChange={(d) => useStore.getState().setKickoff(client.id, meeting.id, d)}>
+                    <Icon name="flag" size={12} />{meeting.kickoff ? `Kickoff ${formatDue(meeting.kickoff.date, todayIso())}` : 'Set kickoff'}
+                  </DatePickButton>
+                </span>
+              </div>
             </>
           ) : (
             <>
-              <span className="board-name static">Ad-hoc</span>
-              <span className="board-sub">Work not tied to a meeting</span>
+              <h2 className="board-name">Ad-hoc</h2>
+              <div className="board-sub">Work not tied to a meeting · {deliverables.length} deliverable{deliverables.length === 1 ? '' : 's'}</div>
             </>
           )}
         </div>
-        {meeting && (
-          <div className={`kickoff${meeting.kickoff?.done ? ' done' : ''}`}>
-            {meeting.kickoff && (
-              <Checkbox small checked={meeting.kickoff.done} label={meeting.kickoff.done ? 'Kickoff done. Undo' : 'Mark kickoff done'}
-                onToggle={() => useStore.getState().toggleKickoffDone(client.id, meeting.id)} />
-            )}
-            <DatePickButton id={`kickoff-${meeting.id}`} value={meeting.kickoff?.date ?? null} label="Kickoff date"
-              title={meeting.kickoff ? `Kickoff ${formatLong(meeting.kickoff.date)}: work on this meeting starts. Shows on the weekly calendar.` : 'When work on this meeting should start. Shows on the weekly calendar.'}
-              className={`meta-btn kickoff-btn${meeting.kickoff ? '' : ' empty'}`}
-              onChange={(d) => useStore.getState().setKickoff(client.id, meeting.id, d)}>
-              <Icon name="flag" size={13} /><span>{meeting.kickoff ? `Kickoff ${formatDue(meeting.kickoff.date, todayIso())}` : 'Set kickoff'}</span>
-            </DatePickButton>
-          </div>
-        )}
         <div className="board-progress">
-          {p.total > 0 && p.done < p.total && <span className="bar wide"><span style={{ width: `${(100 * p.done) / p.total}%` }} /></span>}
-          <span className={p.total > 0 && p.done === p.total ? 'all-done' : ''}>{p.total > 0 && p.done === p.total ? <><Icon name="check" size={13} /> All {p.total} done</> : `${p.done}/${p.total} done`}</span>
+          {p.total > 0 && <span className="bar wide"><span style={{ width: `${(100 * p.done) / p.total}%` }} /></span>}
+          <span>{p.done} of {p.total} tasks done</span>
           {meeting && <Menu className="icon-btn" button={<Icon name="more" size={16} />} label="Meeting actions" items={[
             { label: 'Delete meeting…', danger: true, onSelect: () => void onDeleteMeeting() },
           ]} />}
@@ -126,9 +128,9 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
       </div>
 
       <div className="columns">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[horizontalOnly]}
+        <DndContext sensors={sensors} collisionDetection={closestCenter}
           onDragEnd={(e) => { const r = reorder(ids, e); if (r) moveDeliverable(client.id, boardId, ...r); }}>
-          <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+          <SortableContext items={ids} strategy={rectSortingStrategy}>
             {deliverables.map((d) => <Column key={d.id} d={d} client={client} highlightTaskId={highlightTaskId} />)}
           </SortableContext>
         </DndContext>

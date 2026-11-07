@@ -319,3 +319,19 @@ other people's work at my clients.
 - The test clicked within dnd-kit's 50ms post-drop click guard. That was a test-only problem; a pause was added.
 
 **Not done:** see `tasks/roadmap.md`.
+
+## Review — mockup layout (user-supplied design)
+- **Adopted:**
+  - **Top bar:** breadcrumb, undo/redo, "Saved in this browser only" pill, Export backup.
+  - **Meetings card:** white, with an Ad-hoc pill in its header; simpler tiles ("5/5 complete") and a "+ Meeting" button.
+  - **Meeting header:** the name, with a "date · n deliverables · kickoff" line, and "x of y tasks done" on the right.
+  - **Columns:** open (no gray), wrapping to new rows.
+  - **Task cards:** always show Unassigned / No date.
+  - **Selected client:** a white card; a red dot marks clients with overdue work.
+  - **Planned through:** shows a "Set a date" link when empty.
+- **Kept per the user:** real client logos, and no search.
+- **Added:**
+  - **Export backup:** downloads the file in the full app; the hosted page shows a copy box instead.
+  - **Restore:** Import restores a backup as one undoable step.
+- **Data:** "(T)" people merged into their base names in the built-in data (51 → 45 people).
+- **Verified:** 51 unit tests, 18 e2e steps (including backup export and restore), and screenshots in light and dark.

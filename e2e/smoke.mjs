@@ -113,14 +113,14 @@ try {
   });
 
   await step('ad-hoc task with a due date shows as a timeline dot', async () => {
-    await page.locator('.tl-adhoc').click();
+    await page.locator('.adhoc-pill').click();
     await page.getByRole('button', { name: 'Add task' }).click();
     await page.getByPlaceholder('Task name, then Enter').fill('Send SOW');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
     await page.locator('.task-card', { hasText: 'Send SOW' }).locator('input[type=date]').fill('2026-01-15');
     await page.locator('.tl-dot.overdue').waitFor();
-    await expectText(page.locator('.tl-adhoc'), '1 overdue');
+    await expectText(page.locator('.adhoc-pill'), '1 overdue');
   });
 
   await step('undo and redo', async () => {
@@ -132,7 +132,7 @@ try {
   });
 
   await step('saves and everything survives a reload', async () => {
-    await expectText(page.locator('.save-status'), 'Saved');
+    await expectText(page.locator('.save-pill'), 'Saved');
     await page.reload();
     await page.getByRole('button', { name: 'Use test storage' }).click(); // loads the saved workspace.json
     await expectText(page.locator('.client-name'), 'Test Co');
@@ -174,7 +174,7 @@ try {
     await expectText(page.locator('.client-name'), 'Imported Widgets');
     await page.locator('.client-header img.client-logo').waitFor();
     await page.locator('.tl-tile', { hasText: 'Fall 2026' }).waitFor();
-    await page.locator('.tl-adhoc').click();
+    await page.locator('.adhoc-pill').click();
     await expectText(page.locator('.task-card'), 'Send invoice');
   });
 
@@ -192,7 +192,7 @@ try {
 
   await step('due dates show the weekday and flag weekends', async () => {
     await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
-    await page.locator('.tl-adhoc').click();
+    await page.locator('.adhoc-pill').click();
     const card = page.locator('.task-card', { hasText: 'Request 2026 org chart' });
     await card.locator('input[type=date]').fill(saturdayIso);
     await expectText(card.locator('.meta-btn.weekend'), 'Sat');
@@ -255,6 +255,23 @@ try {
     await page.locator('.nav-link-row').click();
     await page.locator('.wg-cell .chip.kickoff', { hasText: 'Leadership readout' }).waitFor();
     await page.screenshot({ path: 'test-results/week.png' });
+  });
+
+  await step('exports a backup and restores it through Import', async () => {
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export backup' }).click()]);
+    const file = await download.path();
+    const { readFileSync } = await import('node:fs');
+    const backup = readFileSync(file, 'utf8');
+    if (!backup.includes('"schemaVersion"')) throw new Error('backup has no schemaVersion');
+    // Change something, then restore the backup and check the change is gone.
+    await page.locator('.nav-item', { hasText: 'Atlas Manufacturing' }).locator('.nav-link').click();
+    await page.getByRole('button', { name: 'Client actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete client…' }).click();
+    await page.getByRole('button', { name: 'Delete client' }).click();
+    await page.locator('.nav-item', { hasText: 'Atlas Manufacturing' }).waitFor({ state: 'detached' });
+    await page.getByLabel('Client files to import').setInputFiles([{ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) }]);
+    await page.getByRole('button', { name: 'Restore backup' }).click();
+    await page.locator('.nav-item', { hasText: 'Atlas Manufacturing' }).waitFor();
   });
 
   await step('demo client page screenshot', async () => {

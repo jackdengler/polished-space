@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { addDays, dayNumber, mondayOf, todayIso } from '../model/dates';
 import type { Client } from '../model/schema';
+import { isOverdue } from '../model/derive';
 import { setPrefs, usePrefs, type Theme } from '../prefs';
 import { navigate, type Route } from '../router';
 import { useStore } from '../store/store';
@@ -11,7 +12,6 @@ import { Icon } from './Icon';
 import { ImportClients, type ImportHandle } from './ImportClients';
 import { AddInput } from './InlineEdit';
 import { Popover } from './Popover';
-import { SaveStatus } from './SaveStatus';
 import { useMe } from './WhoAmI';
 
 export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () => void }) {
@@ -24,12 +24,19 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
   const active = clients.filter((c) => !c.archived).sort(byName);
   const archived = clients.filter((c) => c.archived).sort(byName);
   const go = (r: Partial<Route>) => { navigate(r); onNavigate?.(); };
+  const today = todayIso();
+  const overdue = (c: Client) => {
+    let n = 0;
+    for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const t of d.tasks) if (isOverdue(t, today)) n++;
+    return n;
+  };
 
   const item = (c: Client) => (
     <div key={c.id} className={`nav-item${route.clientId === c.id ? ' active' : ''}`}>
       <a href={`#/c/${c.id}`} className="nav-link" onClick={(e) => { e.preventDefault(); go({ clientId: c.id }); }}>
         <span className="logo-tile"><ClientLogo client={c} size={18} /></span>
         <span className="nav-name">{c.name}</span>
+        {!c.archived && overdue(c) > 0 && <span className="nav-dot" title={`${overdue(c)} overdue`} aria-label={`${overdue(c)} overdue`} />}
       </a>
       <button className="icon-btn tiny archive-btn" title={c.archived ? 'Unarchive' : 'Archive'} aria-label={`${c.archived ? 'Unarchive' : 'Archive'} ${c.name}`}
         onClick={() => useStore.getState().setArchived(c.id, !c.archived)}>
@@ -44,7 +51,6 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">C</span>
           <span className="brand-name">Compensian PM</span>
-          <UndoRedo />
         </div>
         <WorkspaceMenu />
       </div>
@@ -83,17 +89,6 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
   );
 }
 
-function UndoRedo() {
-  const canUndo = useStore((s) => s.past.length > 0);
-  const canRedo = useStore((s) => s.future.length > 0);
-  return (
-    <span className="undo-redo">
-      <button className="icon-btn tiny" disabled={!canUndo} onClick={() => useStore.getState().undo()} aria-label="Undo" title="Undo (Ctrl+Z)"><Icon name="undo" size={14} /></button>
-      <button className="icon-btn tiny" disabled={!canRedo} onClick={() => useStore.getState().redo()} aria-label="Redo" title="Redo (Ctrl+Shift+Z)"><Icon name="redo" size={14} /></button>
-    </span>
-  );
-}
-
 /** Where the data lives + workspace actions (team, import, theme, switch). */
 function WorkspaceMenu() {
   const adapter = usePersistence((s) => s.adapter);
@@ -105,10 +100,9 @@ function WorkspaceMenu() {
   return (
     <>
       <button ref={ref} className="workspace-btn" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>
-        <Icon name={adapter?.kind === 'folder' ? 'folder' : 'browser'} size={14} />
+        <Icon name={adapter?.kind === 'folder' ? 'folder' : 'browser'} size={15} />
         <span className="ws-name">{adapter?.name}</span>
-        <SaveStatus />
-        <Icon name="chevronDown" size={12} />
+        <Icon name="updown" size={14} />
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={232}>
         <div role="menu" className="menu">

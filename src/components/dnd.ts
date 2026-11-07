@@ -14,4 +14,3 @@ export class SmartPointerSensor extends PointerSensor {
 export const sensorOptions = { activationConstraint: { distance: 6 } };
 
 export const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
-export const horizontalOnly: Modifier = ({ transform }) => ({ ...transform, y: 0 });

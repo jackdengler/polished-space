@@ -81,6 +81,8 @@ export interface Store {
 
   /** Replace everything (after loading from disk). Clears undo history. */
   load(ws: Workspace): void;
+  /** Replace everything (restore a backup) as one undoable step. */
+  replaceAll(ws: Workspace): void;
   undo(): void;
   redo(): void;
 
@@ -149,6 +151,10 @@ export const useStore = create<Store>()((set, get) => {
     future: [],
 
     load: (ws) => set({ ws, past: [], future: [] }),
+    replaceAll: (next) => {
+      const prev = get().ws;
+      set({ ws: next, past: [...get().past.slice(-(HISTORY_LIMIT - 1)), prev], future: [] });
+    },
     undo: () => {
       const { past, ws, future } = get();
       const prev = past[past.length - 1];

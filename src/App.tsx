@@ -6,6 +6,7 @@ import { ConfirmHost } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
 import { TeamSettings } from './components/TeamSettings';
 import { Welcome } from './components/Welcome';
+import { TopBar } from './components/TopBar';
 import { WeekPage } from './components/WeekPage';
 import { WhoAmIModal } from './components/WhoAmI';
 import { navigate, useRoute } from './router';
@@ -34,7 +35,7 @@ function useGlobalKeys() {
 function Banners() {
   const { status, error, adapter } = usePersistence();
   if (adapter?.kind === 'memory') {
-    if (status !== 'error') return <div className="banner info">Saved only in this browser. Clearing your browser data erases it.</div>;
+    if (status !== 'error') return null;
   }
   if (status === 'conflict') {
     return (
@@ -91,6 +92,7 @@ export function App() {
       <div className="nav-scrim" onClick={() => setNavOpen(false)} />
       <main className="main">
         <button className="nav-toggle icon-btn" aria-label="Open navigation" onClick={() => setNavOpen(true)}><Icon name="menu" size={18} /></button>
+        <TopBar route={route} />
         <Banners />
         {route.weekPage
           ? <WeekPage week={route.week ?? null} />

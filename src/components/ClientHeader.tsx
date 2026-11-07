@@ -66,7 +66,7 @@ export function ClientHeader({ client }: { client: Client }) {
           </div>
           <div className="meta-item">
             <span className="meta-label">Planned through</span>
-            <FlexDateInput value={client.plannedThrough} allowClear label="planned through" placeholder="Not set"
+            <FlexDateInput value={client.plannedThrough} allowClear label="planned through" placeholder="Set a date"
               onChange={(d) => setPlannedThrough(client.id, d)} />
           </div>
         </div>

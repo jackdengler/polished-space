@@ -6,11 +6,10 @@ import { forgetFolder, getSavedFolder, saveFolder } from '../storage/handleStore
 import { clearSavedBrowserWorkspace, loadSavedBrowserWorkspace, MemoryAdapter } from '../storage/memoryAdapter';
 import { confirmDialog, ConfirmHost } from './Modal';
 import { readSeed } from '../seed';
+import { embedded } from '../lib/env';
 import { attach, flush } from '../storage/persistence';
 import { Icon } from './Icon';
 
-/** Embedded previews (e.g. a hosted page inside another site) can't open folders. */
-const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
 const supported = typeof window.showDirectoryPicker === 'function' && !embedded;
 const BROWSER_KEY = 'compensian-pm-demo';
 const seed = readSeed();
