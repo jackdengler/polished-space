@@ -36,7 +36,7 @@ function MergeButton({ member, others }: { member: TeamMember; others: TeamMembe
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const shown = others.filter((m) => m.name.toLowerCase().includes(q.trim().toLowerCase()));
-  // Suggest likely matches first: same first word (e.g. "Dom" → "Dominik Arbet").
+  // Suggest likely matches first: same first word (e.g. "Sam" → "Samantha Reyes").
   const first = member.name.split(/[\s.(]/)[0]!.toLowerCase();
   const likely = (m: TeamMember) => first.length >= 2 && m.name.toLowerCase().startsWith(first);
   const sorted = [...shown].sort((a, b) => Number(likely(b)) - Number(likely(a)));

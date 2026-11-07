@@ -68,16 +68,16 @@ describe('store actions', () => {
 
 describe('mergeMember', () => {
   it('moves tasks and client teams to the kept person', () => {
-    const dom = s().addMember('Dom');
-    const full = s().addMember('Dominik Arbet');
+    const sam = s().addMember('Sam');
+    const full = s().addMember('Samantha Reyes');
     const c = s().addClient('Acme');
-    s().toggleClientMember(c, dom);
+    s().toggleClientMember(c, sam);
     s().toggleClientMember(c, full);
     const d = s().ws.clients[0]!.adhoc.deliverables[0]!.id;
     const t = s().addTask(d, 'Call');
-    s().updateTask(t, { assigneeId: dom });
-    s().mergeMember(dom, full);
-    expect(s().ws.teamMembers.map((m) => m.name)).toEqual(['Dominik Arbet']);
+    s().updateTask(t, { assigneeId: sam });
+    s().mergeMember(sam, full);
+    expect(s().ws.teamMembers.map((m) => m.name)).toEqual(['Samantha Reyes']);
     expect(s().ws.clients[0]!.teamMemberIds).toEqual([full]);
     expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeId).toBe(full);
   });
