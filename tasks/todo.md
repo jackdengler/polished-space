@@ -1,6 +1,6 @@
 # Project Management App — v1 Plan (Client Pages)
 
-Status: **DRAFT — nearly final, awaiting approval**
+Status: **v1 BUILT** (see Review)
 
 ## Goal
 Track timelines and statuses of client work. A left sidebar lists clients. Each
@@ -97,24 +97,24 @@ Autosaves shortly after each change. The app remembers the folder between visits
 
 ## Build checklist
 
-- [ ] Scaffold Vite + React + TS, linting, `npm run build` / `dev`
-- [ ] Zod schemas and types for the data model, plus a schema version
-- [ ] FlexDate parser, formatter and sort key, with unit tests (Vitest)
-- [ ] Store with named actions, plus unit tests
-- [ ] `StorageAdapter` interface, plus `LocalFolderAdapter` (File System Access API) and an in-memory/IndexedDB fallback for testing
-- [ ] Welcome screen: "Open folder" / "Create new workspace"
-- [ ] Sidebar with client list, search and new client
-- [ ] Client header: logo upload, team chips, planned-through date
-- [ ] Meeting timeline (today + planned-through markers, flex-date bands)
-- [ ] Ad-hoc tile pinned on the timeline, an ad-hoc page (reuses the meeting page), and ad-hoc task dots on the timeline
-- [ ] Meeting page: deliverable columns, task cards, subtask checklist; inline create, edit and delete
-- [ ] Done toggle, assignee and due-date controls; overdue styling; derived progress
-- [ ] Team members settings (shared list); client team picker; assignee picker with search
-- [ ] Drag to reorder tasks within a column and to reorder columns (dnd-kit)
-- [ ] Light/dark theme tokens (follows system)
-- [ ] Autosave and a save-status indicator; handle a folder permission prompt on reload
-- [ ] Playwright smoke test: create client → meeting → deliverable → task → subtask, reload, data persists
-- [ ] Update README (setup, privacy: data stays local)
+- [x] Scaffold Vite + React + TS, linting, `npm run build` / `dev`
+- [x] Zod schemas and types for the data model, plus a schema version
+- [x] FlexDate parser, formatter and sort key, with unit tests (Vitest)
+- [x] Store with named actions, plus unit tests
+- [x] `StorageAdapter` interface, plus `LocalFolderAdapter` (File System Access API) and an in-memory/IndexedDB fallback for testing
+- [x] Welcome screen: "Open folder" / "Create new workspace"
+- [x] Sidebar with client list, search and new client
+- [x] Client header: logo upload, team chips, planned-through date
+- [x] Meeting timeline (today + planned-through markers, flex-date bands)
+- [x] Ad-hoc tile pinned on the timeline, an ad-hoc page (reuses the meeting page), and ad-hoc task dots on the timeline
+- [x] Meeting page: deliverable columns, task cards, subtask checklist; inline create, edit and delete
+- [x] Done toggle, assignee and due-date controls; overdue styling; derived progress
+- [x] Team members settings (shared list); client team picker; assignee picker with search
+- [x] Drag to reorder tasks within a column and to reorder columns (dnd-kit)
+- [x] Light/dark theme tokens (follows system)
+- [x] Autosave and a save-status indicator; handle a folder permission prompt on reload
+- [x] Playwright smoke test: create client → meeting → deliverable → task → subtask, reload, data persists
+- [x] Update README (setup, privacy: data stays local)
 
 ## Decisions log
 - Stack: TypeScript + React + Vite. Rust considered; possibly later for the server or a Tauri desktop wrapper.
@@ -130,11 +130,47 @@ Autosaves shortly after each change. The app remembers the folder between visits
   Clients in the sidebar are sorted alphabetically.
 - Style: clean and minimal (Linear/Notion-like): white, subtle grays, one accent color. Dark mode follows the system setting.
 
+- Browser: Chrome. Workspace folder may live in OneDrive (single user). The app checks for outside changes before each save and warns instead of overwriting.
+- Safety: undo/redo (Ctrl+Z / Ctrl+Shift+Z) and rolling backups (last 20, at most one every 5 min) in `backups/`.
+- Clients are archived (collapsed sidebar section), not deleted. Delete is still available behind a confirmation.
+- Timeline warnings: amber dot on a past meeting with open tasks; meetings after planned-through are faded.
+- Dates: US format. Broad dates: Nov 2026, Q4 2026, H1 2027, Fall 2026, Early 2027, Early Nov 2026, 2026.
+- Demo data: "Try the demo" (in memory, not saved), or start a new folder pre-filled with demo data.
+- Repo is public for now; the owner will make it private later. Importing existing client JSONs comes later.
+
 ## Later (not v1)
-Meeting templates / duplicate · My tasks & upcoming views · server sync · mobile · AI assistant · notes
+Import existing client JSONs · Meeting templates / duplicate · search across clients · print/export · My tasks & upcoming views · server sync · mobile · AI assistant · notes
 
 ## Open questions
 See the chat.
 
 ## Review
-_(filled in after the build)_
+
+**Built:** everything in the checklist above. Deviations from the plan:
+- **Linting** is `tsc --strict` (with unused-code checks) only. ESLint was skipped to keep the toolchain small.
+- **Deleting a task or subtask** has no confirmation; Undo covers it. Clients, meetings, deliverables with tasks, and team members all ask first.
+- **Old logo files** are kept when a logo is replaced or removed, so Undo can restore them.
+- **The storage fallback** for tests uses the browser's private file system (`?storage=opfs`), which exercises the real FolderAdapter code.
+  In test mode the folder isn't remembered across reloads, because headless Chromium crashes reloading a page whose IndexedDB holds a private-file-system handle.
+  Real folder handles are unaffected.
+
+**Verified:**
+- `npm test`: 38 unit tests pass (flex-date parsing for exact and broad formats, ordering, store actions, undo/redo, member deletion, timeline scale, demo data validity).
+- `npm run e2e`: 11 steps pass in Chromium:
+  - demo setup
+  - add client
+  - broad planned-through date
+  - add meeting (faded when after planned-through)
+  - deliverable → tasks → subtask, assign via search, complete
+  - drag reorder
+  - ad-hoc due date shows as an overdue timeline dot
+  - undo/redo
+  - autosave, then reload, with all data and task order intact
+  - archive
+  - no browser console errors
+- Screenshots reviewed in light and dark mode.
+
+**Not verified here:** the real OS folder picker and OneDrive syncing. These need a person in Chrome.
+The same code path is tested via the browser's private file system.
+
+**Next ideas:** import existing client JSONs, meeting templates, My tasks view, server sync.

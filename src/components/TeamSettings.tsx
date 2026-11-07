@@ -1,0 +1,76 @@
+import { useMemo, useRef, useState } from 'react';
+import { MEMBER_COLORS } from '../model/derive';
+import type { TeamMember } from '../model/schema';
+import { useStore } from '../store/store';
+import { useUi } from '../ui';
+import { Avatar } from './Avatar';
+import { Icon } from './Icon';
+import { AddInput, InlineEdit } from './InlineEdit';
+import { confirmDialog, Modal } from './Modal';
+import { Popover } from './Popover';
+
+function ColorPicker({ member }: { member: TeamMember }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const update = useStore((s) => s.updateMember);
+  return (
+    <>
+      <button ref={ref} className="avatar-btn" onClick={() => setOpen(true)} aria-label={`Change color for ${member.name}`}>
+        <Avatar member={member} size={26} />
+      </button>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={176}>
+        <div className="swatches">
+          {MEMBER_COLORS.map((c) => (
+            <button key={c} className={`swatch${c === member.color ? ' on' : ''}`} style={{ background: c }} aria-label={c}
+              onClick={() => { update(member.id, { color: c }); setOpen(false); }} />
+          ))}
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+export function TeamSettings() {
+  const open = useUi((s) => s.teamOpen);
+  const ws = useStore((s) => s.ws);
+  const { addMember, updateMember, deleteMember } = useStore.getState();
+  const [adding, setAdding] = useState(false);
+
+  const counts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const c of ws.clients) for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const t of d.tasks)
+      if (t.assigneeId && !t.done) n.set(t.assigneeId, (n.get(t.assigneeId) ?? 0) + 1);
+    return n;
+  }, [ws]);
+
+  if (!open) return null;
+  const close = () => useUi.setState({ teamOpen: false });
+  const members = [...ws.teamMembers].sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <Modal title="Team" onClose={close} width={460}>
+      <p className="modal-text">Everyone at the company who can be put on clients and assigned tasks.</p>
+      <div className="team-list">
+        {members.map((m) => (
+          <div key={m.id} className="team-row">
+            <ColorPicker member={m} />
+            <InlineEdit className="grow" value={m.name} label="name" onCommit={(name) => updateMember(m.id, { name })} />
+            <span className="muted small">{counts.get(m.id) ?? 0} open</span>
+            <button className="icon-btn" aria-label={`Remove ${m.name}`} title="Remove"
+              onClick={async () => {
+                if (await confirmDialog({ title: `Remove ${m.name}?`, message: 'They will be taken off all clients and their tasks will become unassigned.', confirmLabel: 'Remove', danger: true }))
+                  deleteMember(m.id);
+              }}>
+              <Icon name="trash" size={15} />
+            </button>
+          </div>
+        ))}
+        {members.length === 0 && !adding && <div className="muted small pad">No one yet.</div>}
+        {adding
+          ? <AddInput placeholder="Full name, then Enter" onAdd={(n) => addMember(n)} onDone={() => setAdding(false)} />
+          : <button className="btn btn-ghost add-row" onClick={() => setAdding(true)}><Icon name="plus" size={14} /> Add person</button>}
+      </div>
+      <div className="modal-actions"><button className="btn btn-primary" onClick={close}>Done</button></div>
+    </Modal>
+  );
+}

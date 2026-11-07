@@ -1,0 +1,118 @@
+import { useEffect, useState } from 'react';
+import { makeDemoWorkspace } from '../model/demo';
+import { emptyWorkspace, type Workspace } from '../model/schema';
+import { FolderAdapter } from '../storage/folderAdapter';
+import { forgetFolder, getSavedFolder, saveFolder } from '../storage/handleStore';
+import { MemoryAdapter } from '../storage/memoryAdapter';
+import { attach, flush } from '../storage/persistence';
+import { Icon } from './Icon';
+
+const supported = typeof window.showDirectoryPicker === 'function';
+/** `?storage=opfs` uses the browser's private file system instead of a picked folder (for automated tests). */
+const testStorage = new URLSearchParams(location.search).get('storage') === 'opfs';
+
+export function Welcome() {
+  const [saved, setSaved] = useState<FileSystemDirectoryHandle | null>(null);
+  const [emptyFolder, setEmptyFolder] = useState<FolderAdapter | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (testStorage) return;
+    void getSavedFolder().then(async (h) => {
+      if (!h) return;
+      setSaved(h);
+      // Chrome may remember the permission; if so, open straight away.
+      if ((await h.queryPermission({ mode: 'readwrite' })) === 'granted') void open(h);
+    });
+  }, []);
+
+  async function open(handle: FileSystemDirectoryHandle) {
+    setError(null);
+    setBusy(true);
+    try {
+      if ((await handle.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
+          (await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+        setError('Permission to the folder was not granted.');
+        return;
+      }
+      const adapter = new FolderAdapter(handle);
+      const ws = await adapter.load();
+      // Test storage isn't remembered: headless Chromium crashes reloading a page whose IndexedDB holds a private-file-system handle.
+      if (!testStorage) await saveFolder(handle);
+      if (ws) attach(adapter, ws);
+      else setEmptyFolder(adapter);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pick() {
+    try {
+      const handle = testStorage ? await navigator.storage.getDirectory() : await window.showDirectoryPicker!({ id: 'compensian-pm', mode: 'readwrite' });
+      await open(handle);
+    } catch (e) {
+      if ((e as DOMException).name !== 'AbortError') setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function start(adapter: FolderAdapter, ws: Workspace) {
+    attach(adapter, ws);
+    await flush(); // create workspace.json right away
+  }
+
+  if (emptyFolder) {
+    return (
+      <Shell>
+        <h2 className="welcome-h2">Set up “{emptyFolder.name}”</h2>
+        <p className="muted">This folder doesn't have a workspace yet. A <code>workspace.json</code> file will be created in it.</p>
+        <div className="welcome-actions">
+          <button className="btn btn-primary btn-lg" onClick={() => void start(emptyFolder, emptyWorkspace())}>Start empty</button>
+          <button className="btn btn-lg" onClick={() => void start(emptyFolder, makeDemoWorkspace())}>Start with demo data</button>
+          <button className="btn btn-ghost" onClick={() => setEmptyFolder(null)}>Back</button>
+        </div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell>
+      <p className="welcome-lead">Track client meetings, deliverables and tasks.</p>
+      <div className="welcome-actions">
+        {saved && (
+          <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => void open(saved)}>
+            <Icon name="folder" size={16} /> Reopen “{saved.name}”
+          </button>
+        )}
+        {(supported || testStorage) && (
+          <button className={`btn btn-lg${saved ? '' : ' btn-primary'}`} disabled={busy} onClick={() => void pick()}>
+            <Icon name="folder" size={16} /> {testStorage ? 'Use test storage' : saved ? 'Open a different folder' : 'Open or create a workspace folder'}
+          </button>
+        )}
+        <button className="btn btn-lg" onClick={() => attach(new MemoryAdapter(), makeDemoWorkspace())}>Try the demo</button>
+      </div>
+      {saved && <button className="link small" onClick={() => { void forgetFolder(); setSaved(null); }}>Forget “{saved.name}”</button>}
+      {error && <p className="welcome-error" role="alert"><Icon name="alert" size={14} /> {error}</p>}
+      {!supported && !testStorage && (
+        <p className="welcome-error">This browser can't save to a folder. Open the app in Chrome or Edge, or try the demo.</p>
+      )}
+      <p className="welcome-fine">
+        Your data stays in the folder you choose (OneDrive is fine) — nothing is uploaded.
+        The demo uses sample data and isn't saved.
+      </p>
+    </Shell>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="welcome">
+      <div className="welcome-card">
+        <div className="brand big"><span className="brand-mark"><Icon name="check" size={18} /></span><span className="brand-name">Compensian PM</span></div>
+        {children}
+      </div>
+    </div>
+  );
+}
