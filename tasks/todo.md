@@ -45,6 +45,7 @@ Workspace
  ├─ teamMembers: TeamMember[]      { id, name, initials, color }
  └─ clients: Client[]
      { id, name, logo (file in /logos), teamMemberIds[], plannedThrough: FlexDate }
+     ├─ adhoc: { deliverables[] }  ← one per client, no date; same structure as a meeting
      └─ meetings: Meeting[]        { id, title?, date: FlexDate }
          └─ deliverables[]         { id, title }
              └─ tasks[]            { id, title, assigneeId, dueDate, done: boolean }
@@ -78,6 +79,12 @@ Autosaves shortly after each change. The app remembers the folder between visits
 - **Meeting timeline:** a horizontal strip under the header with meetings placed in date order,
   each showing date, title and progress. Broad dates ("Fall 2026") show as a soft band.
   Marks for **today** and **planned through**. Click a meeting to open it. "+ Meeting" adds one.
+- **Ad-hoc tile:** pinned at the left edge of the timeline (doesn't scroll away). It shows the open count,
+  plus an overdue count in red if any. Clicking it opens the ad-hoc page, which works exactly like a meeting page
+  (deliverable columns → task cards → subtasks) but has no date.
+  - Ad-hoc tasks with a due date also appear as **small dots** on the timeline at that date
+    (red if overdue, hidden once done). Hovering a dot shows the task; clicking it opens the ad-hoc page with that card highlighted.
+  - Tasks cannot be moved between ad-hoc and meetings.
 - **Meeting page** (below the timeline; the URL updates so it can be linked or bookmarked):
   - Header: meeting date (flex), title, overall progress.
   - **Deliverables as columns** side by side (scroll sideways when there are many), with title and progress in each header.
@@ -99,6 +106,7 @@ Autosaves shortly after each change. The app remembers the folder between visits
 - [ ] Sidebar with client list, search and new client
 - [ ] Client header: logo upload, team chips, planned-through date
 - [ ] Meeting timeline (today + planned-through markers, flex-date bands)
+- [ ] Ad-hoc tile pinned on the timeline, an ad-hoc page (reuses the meeting page), and ad-hoc task dots on the timeline
 - [ ] Meeting page: deliverable columns, task cards, subtask checklist; inline create, edit and delete
 - [ ] Done toggle, assignee and due-date controls; overdue styling; derived progress
 - [ ] Team members settings (shared list); client team picker; assignee picker with search
@@ -113,6 +121,7 @@ Autosaves shortly after each change. The app remembers the folder between visits
 - Client page: meeting timeline at top → click opens that meeting's page.
 - Meeting page: deliverable columns with task cards.
 - Done/not done only. Subtasks are a title + checkbox. Deliverables get progress only from their tasks.
+- Ad-hoc: a tile pinned on the timeline. Same deliverable/task structure as a meeting. Dated tasks show as dots on the timeline. No moving tasks in or out.
 - No notes. No extra views (My tasks etc.). Templates later.
 - Team: one shared company list managed in settings. Clients pick their team from it.
 - Assignee picker: shows the client's team first, plus a search to find anyone in the company.
