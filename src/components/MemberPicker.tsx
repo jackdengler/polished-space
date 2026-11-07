@@ -5,8 +5,10 @@ import { openTeamSettings } from '../ui';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 
-/** Pick an assignee: the client's team first, with search across the whole company. */
-export function MemberPicker({ client, value, onPick }: { client: Client; value: string | null; onPick: (id: string | null) => void }) {
+/** Pick who's on a task: the client's team first, with search across the whole company. Stays open while you tick. */
+export function MemberPicker({ client, selected, onToggle, onClear }: {
+  client: Client; selected: string[]; onToggle: (id: string) => void; onClear: () => void;
+}) {
   const members = useStore((s) => s.ws.teamMembers);
   const [q, setQ] = useState('');
   const query = q.trim().toLowerCase();
@@ -14,20 +16,24 @@ export function MemberPicker({ client, value, onPick }: { client: Client; value:
   const { team, others } = useMemo(() => {
     const match = (m: TeamMember) => !query || m.name.toLowerCase().includes(query);
     const byName = (a: TeamMember, b: TeamMember) => a.name.localeCompare(b.name);
+    const onTask = (m: TeamMember) => selected.includes(m.id);
     return {
-      team: members.filter((m) => client.teamMemberIds.includes(m.id) && match(m)).sort(byName),
+      team: members.filter((m) => (client.teamMemberIds.includes(m.id) || onTask(m)) && match(m)).sort(byName),
       // Everyone else only shows up when searching, to keep the list short.
-      others: query ? members.filter((m) => !client.teamMemberIds.includes(m.id) && match(m)).sort(byName) : [],
+      others: query ? members.filter((m) => !client.teamMemberIds.includes(m.id) && !onTask(m) && match(m)).sort(byName) : [],
     };
-  }, [members, client.teamMemberIds, query]);
+  }, [members, client.teamMemberIds, query, selected]);
 
   const first = team[0] ?? others[0];
-  const row = (m: TeamMember) => (
-    <button key={m.id} className={`picker-row${m.id === value ? ' selected' : ''}`} onClick={() => onPick(m.id)}>
-      <Avatar member={m} size={20} /> <span className="grow">{m.name}</span>
-      {m.id === value && <Icon name="check" size={14} />}
-    </button>
-  );
+  const row = (m: TeamMember) => {
+    const on = selected.includes(m.id);
+    return (
+      <button key={m.id} className={`picker-row${on ? ' selected' : ''}`} role="menuitemcheckbox" aria-checked={on} onClick={() => onToggle(m.id)}>
+        <span className={`check-box small${on ? ' on' : ''}`}>{on && <Icon name="check" size={11} />}</span>
+        <Avatar member={m} size={20} /> <span className="grow">{m.name}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="picker">
@@ -35,22 +41,20 @@ export function MemberPicker({ client, value, onPick }: { client: Client; value:
         <Icon name="search" size={14} />
         <input autoFocus value={q} placeholder="Search everyone…" aria-label="Search team members"
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && first) onPick(first.id); }} />
+          onKeyDown={(e) => { if (e.key === 'Enter' && first) { onToggle(first.id); setQ(''); } }} />
       </div>
       <div className="picker-list">
-        {value && !query && (
-          <button className="picker-row muted" onClick={() => onPick(null)}><Icon name="x" size={14} /> Unassign</button>
-        )}
         {team.length > 0 && <div className="picker-heading">On this client</div>}
         {team.map(row)}
         {others.length > 0 && <div className="picker-heading">Everyone else</div>}
         {others.map(row)}
         {!team.length && !others.length && (
           <div className="picker-empty">
-            {members.length === 0 ? 'No team members yet.' : query ? 'No one matches.' : 'No one on this client yet — type to search everyone.'}
+            {members.length === 0 ? 'No team members yet.' : query ? 'No one matches.' : 'No one on this client yet. Type to search everyone.'}
           </div>
         )}
       </div>
+      {selected.length > 0 && <button className="picker-footer" onClick={onClear}>Clear ({selected.length})</button>}
       {members.length === 0 && <button className="picker-footer" onClick={openTeamSettings}>Add team members…</button>}
     </div>
   );

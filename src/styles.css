@@ -603,3 +603,7 @@ button.column-count:hover { background: color-mix(in srgb, var(--success) 12%, v
 .menu-item.armed { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
 .two-step.armed { opacity: 1 !important; color: var(--danger); background: var(--danger-soft); }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 70; background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 550; box-shadow: var(--shadow-lg); }
+
+.avatar-stack { display: inline-flex; align-items: center; }
+.avatar-stack .avatar + .avatar { margin-left: -5px; }
+.stack-more { margin-left: 3px; font-size: 11px; font-weight: 650; color: var(--text-muted); }

@@ -19,16 +19,24 @@ export const SubtaskSchema = z.object({
   done: z.boolean(),
 });
 
-export const TaskSchema = z.object({
+export const TaskSchema = z.preprocess((raw) => {
+  // Older files stored one person as `assigneeId`; now it's a list.
+  if (raw && typeof raw === 'object' && !('assigneeIds' in raw) && 'assigneeId' in raw) {
+    const { assigneeId, ...rest } = raw as { assigneeId: unknown };
+    return { ...rest, assigneeIds: typeof assigneeId === 'string' ? [assigneeId] : [] };
+  }
+  return raw;
+}, z.object({
   ...record,
   title: z.string(),
-  assigneeId: z.string().nullable(),
+  /** Everyone working on the task (any number, including none). */
+  assigneeIds: z.array(z.string()).default([]),
   dueDate: IsoDate.nullable(),
   done: z.boolean(),
   subtasks: z.array(SubtaskSchema),
   /** Team members who marked this as one of their key tasks (personal gold highlight). */
   keyFor: z.array(z.string()).default([]),
-});
+}));
 
 export const DeliverableSchema = z.object({
   ...record,

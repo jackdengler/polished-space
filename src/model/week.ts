@@ -72,7 +72,8 @@ export function buildWeek(clients: Client[], o: WeekOptions): Week {
       for (const d of b.deliverables) {
         for (const task of d.tasks) {
           if (!task.dueDate) continue;
-          const row = task.assigneeId === o.meId ? 'mine' : mineClient ? 'others' : null;
+          // Mine if I'm one of the people on it; otherwise others' work at my clients.
+          const row = task.assigneeIds.includes(o.meId) ? 'mine' : mineClient ? 'others' : null;
           if (row) place(row, { kind: 'task', id: task.id, task, client, boardId: b.boardId, boardLabel: b.boardLabel, deliverable: d, date: task.dueDate, weekendTag: null });
         }
       }

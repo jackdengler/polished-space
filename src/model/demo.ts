@@ -40,7 +40,7 @@ export function makeDemoWorkspace(today: string = todayIso()): Workspace {
   function task(title: string, assignees: string[], dueDay: string | null, done: boolean, subs: string[] = []): Task {
     return {
       ...rec('task'), title, done,
-      assigneeId: assignees.length ? assignees[Math.floor(rnd() * assignees.length)]! : null,
+      assigneeIds: assignees.length ? [assignees[Math.floor(rnd() * assignees.length)]!] : [],
       dueDate: dueDay,
       subtasks: subs.map((s, i) => ({ ...rec('sub'), title: s, done: done || (i === 0 && rnd() > 0.4) })),
       keyFor: [],

@@ -58,11 +58,11 @@ describe('store actions', () => {
     s().toggleClientMember(c, member);
     const d = s().ws.clients[0]!.adhoc.deliverables[0]!.id;
     const t = s().addTask(d, 'Call');
-    s().updateTask(t, { assigneeId: member });
+    s().toggleAssignee(t, member);
     s().deleteMember(member);
     const client = s().ws.clients[0]!;
     expect(client.teamMemberIds).toEqual([]);
-    expect(client.adhoc.deliverables[0]!.tasks[0]!.assigneeId).toBeNull();
+    expect(client.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toEqual([]);
   });
 });
 
@@ -75,11 +75,11 @@ describe('mergeMember', () => {
     s().toggleClientMember(c, full);
     const d = s().ws.clients[0]!.adhoc.deliverables[0]!.id;
     const t = s().addTask(d, 'Call');
-    s().updateTask(t, { assigneeId: sam });
+    s().toggleAssignee(t, sam);
     s().mergeMember(sam, full);
     expect(s().ws.teamMembers.map((m) => m.name)).toEqual(['Samantha Reyes']);
     expect(s().ws.clients[0]!.teamMemberIds).toEqual([full]);
-    expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeId).toBe(full);
+    expect(s().ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toEqual([full]);
   });
 });
 

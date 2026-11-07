@@ -41,8 +41,8 @@ describe('convertLegacyClients', () => {
     expect(c.adhoc.deliverables.map((d) => d.title)).toEqual(['Billing', 'Goals']);
     const invoice = c.adhoc.deliverables[0]!.tasks[0]!;
     expect(invoice).toMatchObject({ title: 'Send invoice', dueDate: '2026-11-01', done: false });
-    expect(invoice.assigneeId).toBe(r.newMembers[1]!.id);
-    expect(c.adhoc.deliverables[1]!.tasks[0]).toMatchObject({ dueDate: null, done: true, assigneeId: null });
+    expect(invoice.assigneeIds).toEqual([r.newMembers[1]!.id]);
+    expect(c.adhoc.deliverables[1]!.tasks[0]).toMatchObject({ dueDate: null, done: true, assigneeIds: [] });
 
     // A name that is a date becomes the meeting date; otherwise the name is the title.
     expect(c.meetings.map((m) => [m.title, m.date])).toEqual([
@@ -70,7 +70,14 @@ describe('convertLegacyClients', () => {
       meetings: [{ id: 'adhoc', isAdHoc: true, name: '', date: '', deliverables: [{ id: '1', name: 'X', tasks: [{ id: '2', name: 't', assignees: ['Sam Fox'], due: '', complete: false }] }] }], pastMeetings: [] };
     const r = convertLegacyClients([{ name: 'a.json', data }], emptyWorkspace(), opts);
     expect(r.newMembers.map((m) => [m.name, m.role])).toEqual([['Pat Lee', 'Principal'], ['Sam Fox', 'Consultant'], ['Kim Wu', 'Sr Associate']]);
-    expect(r.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeId).toBe(r.newMembers[1]!.id);
+    expect(r.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toEqual([r.newMembers[1]!.id]);
+  });
+
+  it('keeps every assignee', () => {
+    const data = { ...legacy, id: 'client_333', staffing: {}, team: [], pastMeetings: [],
+      meetings: [{ id: 'adhoc', isAdHoc: true, name: '', date: '', deliverables: [{ id: '1', name: 'X', tasks: [{ id: '2', name: 't', assignees: ['Pat Lee', 'Sam Fox', 'pat lee'], due: '', complete: false }] }] }] };
+    const r = convertLegacyClients([{ name: 'a.json', data }], emptyWorkspace(), opts);
+    expect(r.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toHaveLength(2);
   });
 
   it('skips files that are not client exports or are already imported', () => {

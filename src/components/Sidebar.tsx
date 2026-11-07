@@ -141,7 +141,7 @@ function countMyOpen(clients: Client[], meId: string): number {
   for (const c of clients) {
     if (c.archived) continue;
     for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const t of d.tasks)
-      if (!t.done && t.assigneeId === meId && t.dueDate && dayNumber(t.dueDate) <= end) n++;
+      if (!t.done && t.assigneeIds.includes(meId) && t.dueDate && dayNumber(t.dueDate) <= end) n++;
     if (c.teamMemberIds.includes(meId)) for (const m of c.meetings) if (m.kickoff && !m.kickoff.done && dayNumber(m.kickoff.date) <= end) n++;
   }
   return n;

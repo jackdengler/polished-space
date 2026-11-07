@@ -95,6 +95,13 @@ try {
     await page.getByPlaceholder('Search everyone…').fill('Priya');
     await page.keyboard.press('Enter');
     await expectText(card.locator('.meta-btn'), 'Priya');
+    // A second person: the picker stays open while ticking, and the card shows both.
+    await page.getByPlaceholder('Search everyone…').fill('Marcus');
+    await page.keyboard.press('Enter');
+    await card.locator('.avatar-stack .avatar').nth(1).waitFor();
+    await page.getByRole('menuitemcheckbox', { name: /Marcus/ }).click(); // untick again
+    await page.keyboard.press('Escape');
+    await expectText(card.locator('.meta-btn'), 'Priya');
     await card.getByRole('checkbox', { name: /Mark Collect assets done/ }).click();
     await card.locator('.check-box.on').first().waitFor();
     await expectText(page.locator('.column-count'), '1/2');

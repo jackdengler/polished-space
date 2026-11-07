@@ -120,8 +120,10 @@ export interface Store {
   moveDeliverable(clientId: string, boardId: BoardId, from: number, to: number): void;
 
   // Tasks
-  addTask(deliverableId: string, title: string, extra?: Partial<Pick<Task, 'assigneeId' | 'dueDate'>>): string;
-  updateTask(id: string, patch: Partial<Pick<Task, 'title' | 'assigneeId' | 'dueDate'>>): void;
+  addTask(deliverableId: string, title: string, extra?: Partial<Pick<Task, 'assigneeIds' | 'dueDate'>>): string;
+  updateTask(id: string, patch: Partial<Pick<Task, 'title' | 'assigneeIds' | 'dueDate'>>): void;
+  /** Add or remove one person on a task. */
+  toggleAssignee(taskId: string, memberId: string): void;
   toggleTask(id: string): void;
   /** Personal "key task" star for one team member. */
   toggleKey(taskId: string, memberId: string): void;
@@ -185,7 +187,7 @@ export const useStore = create<Store>()((set, get) => {
       ws.teamMembers = ws.teamMembers.filter((m) => m.id !== id);
       for (const c of ws.clients) c.teamMemberIds = c.teamMemberIds.filter((x) => x !== id);
       for (const { d } of allDeliverables(ws)) for (const t of d.tasks) {
-        if (t.assigneeId === id) { t.assigneeId = null; touch(t); }
+        if (t.assigneeIds.includes(id)) { t.assigneeIds = t.assigneeIds.filter((x) => x !== id); touch(t); }
         if (t.keyFor.includes(id)) t.keyFor = t.keyFor.filter((x) => x !== id);
       }
     }),
@@ -204,7 +206,7 @@ export const useStore = create<Store>()((set, get) => {
         }
       }
       for (const { d } of allDeliverables(ws)) for (const t of d.tasks) {
-        if (t.assigneeId === fromId) { t.assigneeId = intoId; touch(t); }
+        if (t.assigneeIds.includes(fromId)) { t.assigneeIds = [...new Set(t.assigneeIds.map((x) => (x === fromId ? intoId : x)))]; touch(t); }
         if (t.keyFor.includes(fromId)) t.keyFor = [...new Set(t.keyFor.map((x) => (x === fromId ? intoId : x)))];
       }
     }),
@@ -272,18 +274,23 @@ export const useStore = create<Store>()((set, get) => {
     moveDeliverable: (clientId, boardId, from, to) => mutate((ws) => { move(findBoard(ws, clientId, boardId).deliverables, from, to); }),
 
     addTask: (deliverableId, title, extra = {}) => {
-      const task: Task = { ...stamp(), title: title.trim(), assigneeId: null, dueDate: null, done: false, subtasks: [], keyFor: [], ...extra };
+      const task: Task = { ...stamp(), title: title.trim(), assigneeIds: [], dueDate: null, done: false, subtasks: [], keyFor: [], ...extra };
       mutate((ws) => { findDeliverable(ws, deliverableId).d.tasks.push(task); });
       return task.id;
     },
     updateTask: (id, patch) => mutate((ws) => {
       const { task } = findTask(ws, id);
       if (patch.title !== undefined) task.title = patch.title.trim();
-      if (patch.assigneeId !== undefined) task.assigneeId = patch.assigneeId;
+      if (patch.assigneeIds !== undefined) task.assigneeIds = patch.assigneeIds;
       if (patch.dueDate !== undefined) task.dueDate = patch.dueDate;
       touch(task);
     }),
     toggleTask: (id) => mutate((ws) => { const { task } = findTask(ws, id); task.done = !task.done; touch(task); }),
+    toggleAssignee: (taskId, memberId) => mutate((ws) => {
+      const { task } = findTask(ws, taskId);
+      task.assigneeIds = task.assigneeIds.includes(memberId) ? task.assigneeIds.filter((x) => x !== memberId) : [...task.assigneeIds, memberId];
+      touch(task);
+    }),
     toggleKey: (taskId, memberId) => mutate((ws) => {
       const { task } = findTask(ws, taskId);
       task.keyFor = task.keyFor.includes(memberId) ? task.keyFor.filter((x) => x !== memberId) : [...task.keyFor, memberId];

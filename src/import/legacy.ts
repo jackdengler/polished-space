@@ -96,7 +96,7 @@ export function convertLegacyClients(
       return {
         ...rec(),
         title: str(o.name) || 'Untitled task',
-        assigneeId: arr(o.assignees).map((a) => memberId(str(a))).find((id) => id) ?? null,
+        assigneeIds: [...new Set(arr(o.assignees).map((a) => memberId(str(a))).filter((id): id is string => !!id))],
         dueDate: isIso(due) ? due : null,
         done: o.complete === true,
         subtasks: [],

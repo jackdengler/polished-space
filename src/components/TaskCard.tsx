@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { formatDue, formatLong, isWeekend, todayIso } from '../model/dates';
 import { isOverdue, memberById } from '../model/derive';
-import type { Client, Task } from '../model/schema';
+import type { Client, Task, TeamMember } from '../model/schema';
 import { useStore } from '../store/store';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
@@ -27,18 +27,32 @@ function AssigneeButton({ task, client }: { task: Task; client: Client }) {
   const members = useStore((s) => s.ws.teamMembers);
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const who = memberById(members, task.assigneeId);
+  const who = task.assigneeIds.map((id) => memberById(members, id)).filter((m) => m !== undefined);
+  const names = who.map((m) => m.name).join(', ');
   return (
     <>
-      <button ref={ref} className={`meta-btn${who ? '' : ' empty'}`} onClick={() => setOpen(true)}
-        aria-label={who ? `Assigned to ${who.name}. Change` : 'Assign'} title={who ? who.name : 'Assign'}>
-        {who ? <><Avatar member={who} size={18} /><span>{who.name.split(' ')[0]}</span></> : <><span className="avatar-empty" /><span>Unassigned</span></>}
+      <button ref={ref} className={`meta-btn${who.length ? '' : ' empty'}`} onClick={() => setOpen(true)}
+        aria-label={who.length ? `Assigned to ${names}. Change` : 'Assign'} title={who.length ? names : 'Assign'}>
+        {who.length === 0 && <><span className="avatar-empty" /><span>Unassigned</span></>}
+        {who.length === 1 && <><Avatar member={who[0]!} size={18} /><span>{who[0]!.name.split(' ')[0]}</span></>}
+        {who.length > 1 && <AvatarStack people={who} />}
       </button>
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240}>
-        <MemberPicker client={client} value={task.assigneeId}
-          onPick={(id) => { useStore.getState().updateTask(task.id, { assigneeId: id }); setOpen(false); }} />
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={250}>
+        <MemberPicker client={client} selected={task.assigneeIds}
+          onToggle={(id) => useStore.getState().toggleAssignee(task.id, id)}
+          onClear={() => useStore.getState().updateTask(task.id, { assigneeIds: [] })} />
       </Popover>
     </>
+  );
+}
+
+/** Overlapping avatars, up to 3, then "+n". */
+export function AvatarStack({ people, size = 18 }: { people: TeamMember[]; size?: number }) {
+  return (
+    <span className="avatar-stack">
+      {people.slice(0, 3).map((m) => <Avatar key={m.id} member={m} size={size} />)}
+      {people.length > 3 && <span className="stack-more">+{people.length - 3}</span>}
+    </span>
   );
 }
 

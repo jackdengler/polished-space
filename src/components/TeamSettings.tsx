@@ -66,7 +66,7 @@ export function TeamSettings() {
   const counts = useMemo(() => {
     const n = new Map<string, number>();
     for (const c of ws.clients) for (const b of [c.adhoc, ...c.meetings]) for (const d of b.deliverables) for (const t of d.tasks)
-      if (t.assigneeId && !t.done) n.set(t.assigneeId, (n.get(t.assigneeId) ?? 0) + 1);
+      if (!t.done) for (const a of t.assigneeIds) n.set(a, (n.get(a) ?? 0) + 1);
     return n;
   }, [ws]);
 

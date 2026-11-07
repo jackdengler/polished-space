@@ -14,7 +14,7 @@ import { sensorOptions, SmartPointerSensor } from './dnd';
 import { Icon } from './Icon';
 import { PeopleList } from './MemberPicker';
 import { Popover } from './Popover';
-import { Checkbox, KeyStar } from './TaskCard';
+import { AvatarStack, Checkbox, KeyStar } from './TaskCard';
 import { useMe } from './WhoAmI';
 
 /** Week label: "Nov 9 – 13", "Nov 30 – Dec 4", with the year when it isn't this year. */
@@ -213,7 +213,8 @@ function ChipBody({ item, row, overdue, overlay }: { item: WeekItem; row: 'mine'
   const key = item.kind === 'task' && !!me && item.task.keyFor.includes(me.id);
   const late = overdue || (item.kind === 'task' ? isOverdue(item.task) : !item.done && dayNumber(item.date) < dayNumber(todayIso()));
   const weekend = !done && !late && isWeekend(item.date);
-  const who = item.kind === 'task' && row === 'others' ? memberById(members, item.task.assigneeId) : undefined;
+  // Show the people on it, except me (in My work, that's who I share it with).
+  const who = item.kind === 'task' ? item.task.assigneeIds.filter((id) => id !== me?.id).map((id) => memberById(members, id)).filter((m) => m !== undefined) : [];
   const s = useStore.getState();
   const open = () => {
     if (Date.now() - lastDragEnd < 250) return;
@@ -237,8 +238,8 @@ function ChipBody({ item, row, overdue, overlay }: { item: WeekItem; row: 'mine'
         {overdue && <span className="chip-tag late-tag">{formatShort(item.date)}</span>}
         {item.weekendTag && <span className="chip-tag weekend-tag" title="Due on a weekend">⚠ {item.weekendTag}</span>}
         {weekend && !item.weekendTag && <span className="chip-tag weekend-tag" title="Due on a weekend">⚠</span>}
-        {who && <Avatar member={who} size={16} />}
-        {row === 'others' && item.kind === 'task' && !item.task.assigneeId && <span className="chip-tag">Unassigned</span>}
+        {who.length > 0 && <AvatarStack people={who} size={16} />}
+        {row === 'others' && item.kind === 'task' && item.task.assigneeIds.length === 0 && <span className="chip-tag">Unassigned</span>}
       </span>
     </div>
   );
@@ -261,7 +262,7 @@ function HoverCard({ item, children }: { item: WeekItem; children: ReactNode }) 
   };
   const hide = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setPos(null), 140); };
   const today = todayIso();
-  const who = item.kind === 'task' ? memberById(members, item.task.assigneeId) : undefined;
+  const who = item.kind === 'task' ? item.task.assigneeIds.map((id) => memberById(members, id)).filter((m) => m !== undefined) : [];
   return (
     <div ref={anchor} onMouseEnter={show} onMouseLeave={hide}
       onPointerDown={(e) => {
@@ -279,7 +280,7 @@ function HoverCard({ item, children }: { item: WeekItem; children: ReactNode }) 
               <div className="hc-title">{item.task.title}</div>
               <div className="hc-meta">{item.boardLabel} · {item.deliverable.title}</div>
               <div className="hc-meta">
-                {who ? <><Avatar member={who} size={16} /> {who.name}</> : 'Unassigned'} · due {formatDue(item.date, today)}
+                {who.length ? <><AvatarStack people={who} size={16} /> {who.map((m) => m.name).join(', ')}</> : 'Unassigned'} · due {formatDue(item.date, today)}
                 {isWeekend(item.date) ? <span className="weekend-text"> (weekend)</span> : null}
               </div>
               {item.task.subtasks.length > 0 && (
@@ -325,7 +326,7 @@ function AddTaskForm({ day, row, onDone }: { day: string; row: 'mine' | 'others'
     if (!client || !title.trim()) return;
     const s = useStore.getState();
     const did = chosenDeliv?.id ?? s.addDeliverable(client.id, boardId, newDeliv.trim() || 'General');
-    s.addTask(did, title, { dueDate: day, assigneeId: row === 'mine' ? me.id : null });
+    s.addTask(did, title, { dueDate: day, assigneeIds: row === 'mine' ? [me.id] : [] });
     onDone();
   };
 

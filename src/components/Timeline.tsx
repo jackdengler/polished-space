@@ -130,10 +130,10 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
           )}
 
           {dots.map((t) => {
-            const who = memberById(members, t.assigneeId);
+            const who = t.assigneeIds.map((id) => memberById(members, id)?.name).filter(Boolean).join(', ');
             return (
               <button key={t.id} className={`tl-dot${isOverdue(t, today) ? ' overdue' : ''}`} style={{ left: scale.x(dayNumber(t.dueDate!)) }}
-                title={`Ad-hoc: ${t.title} · due ${formatDue(t.dueDate!, today)}${who ? ` · ${who.name}` : ''}`}
+                title={`Ad-hoc: ${t.title} · due ${formatDue(t.dueDate!, today)}${who ? ` · ${who}` : ''}`}
                 aria-label={`Ad-hoc task ${t.title}, due ${formatDue(t.dueDate!, today)}`}
                 onClick={() => navigate({ clientId: client.id, boardId: ADHOC, taskId: t.id })} />
             );

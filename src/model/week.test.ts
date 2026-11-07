@@ -21,8 +21,8 @@ describe('weekday helpers', () => {
 // ---- fixtures (fictional) ----
 const t0 = '2026-01-01T00:00:00.000Z';
 let n = 0;
-const task = (title: string, assigneeId: string | null, dueDate: string | null, done = false): Task =>
-  ({ id: `t${++n}`, createdAt: t0, updatedAt: t0, title, assigneeId, dueDate, done, subtasks: [], keyFor: [] });
+const task = (title: string, assignee: string | string[] | null, dueDate: string | null, done = false): Task =>
+  ({ id: `t${++n}`, createdAt: t0, updatedAt: t0, title, assigneeIds: assignee === null ? [] : ([] as string[]).concat(assignee), dueDate, done, subtasks: [], keyFor: [] });
 const client = (name: string, team: string[], tasks: Task[], extra: Partial<Client> = {}): Client => ({
   id: `c-${name}`, createdAt: t0, updatedAt: t0, name, logo: null, teamMemberIds: team, plannedThrough: null, archived: false,
   adhoc: { deliverables: [{ id: `d-${name}`, createdAt: t0, updatedAt: t0, title: 'General', tasks }] },
@@ -37,6 +37,7 @@ describe('buildWeek', () => {
     task('My Tue', ME, '2026-11-10'),
     task('Pat Wed', PAT, '2026-11-11'),
     task('Nobody Thu', null, '2026-11-12'),
+    task('Shared Thu', [PAT, ME], '2026-11-12'),
     task('My Sat', ME, '2026-11-14'),
     task('Overdue mine', ME, '2026-11-03'),
     task('Overdue done', ME, '2026-11-03', true),
@@ -62,6 +63,7 @@ describe('buildWeek', () => {
     expect(titles(w.mine['2026-11-10']!)).toEqual(['My Tue', 'kickoff', 'Me elsewhere']);
     expect(titles(w.others['2026-11-11']!)).toEqual(['Pat Wed']);
     expect(titles(w.others['2026-11-12']!)).toEqual(['Nobody Thu']);
+    expect(titles(w.mine['2026-11-12']!)).toEqual(['Shared Thu']); // shared with me → my work
     // Other people's work at clients I'm not on is not shown.
     expect(Object.values(w.others).flat().some((i) => i.client.name === 'Bolt')).toBe(false);
   });
@@ -145,12 +147,13 @@ describe('schema defaults', () => {
       schemaVersion: SCHEMA_VERSION, teamMembers: [],
       clients: [{
         id: 'c', createdAt: t0, updatedAt: t0, name: 'X', logo: null, teamMemberIds: [], plannedThrough: null, archived: false,
-        adhoc: { deliverables: [{ id: 'd', createdAt: t0, updatedAt: t0, title: 'G', tasks: [{ id: 't', createdAt: t0, updatedAt: t0, title: 'T', assigneeId: null, dueDate: null, done: false, subtasks: [] }] }] },
+        adhoc: { deliverables: [{ id: 'd', createdAt: t0, updatedAt: t0, title: 'G', tasks: [{ id: 't', createdAt: t0, updatedAt: t0, title: 'T', assigneeId: 'm9', dueDate: null, done: false, subtasks: [] }] }] },
         meetings: [{ id: 'm', createdAt: t0, updatedAt: t0, title: '', date: { kind: 'exact', date: '2026-11-12' }, deliverables: [] }],
       }],
     };
     const ws = WorkspaceSchema.parse(old);
     expect(ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.keyFor).toEqual([]);
+    expect(ws.clients[0]!.adhoc.deliverables[0]!.tasks[0]!.assigneeIds).toEqual(['m9']); // old single assignee migrates
     expect(ws.clients[0]!.meetings[0]!.kickoff).toBeNull();
   });
 });
