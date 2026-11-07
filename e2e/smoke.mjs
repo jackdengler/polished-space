@@ -44,6 +44,8 @@ try {
     await page.getByRole('button', { name: 'Use test storage' }).click();
     await page.getByRole('button', { name: 'Start with demo data' }).click();
     await expectText(page.locator('.nav-item'), 'Northwind Health');
+    await page.getByText('Which team member are you?').waitFor(); // starts on This week
+    await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
     await page.locator('.tl-tile.selected').waitFor();
     await page.screenshot({ path: 'test-results/demo.png' });
   });
@@ -269,6 +271,25 @@ try {
     await page.getByLabel('Client files to import').setInputFiles([{ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) }]);
     await page.getByRole('button', { name: 'Restore backup' }).click();
     await page.locator('.nav-item', { hasText: 'Atlas Manufacturing' }).waitFor();
+  });
+
+  await step('sidebar dates and sort; planned-through flag; hide done', async () => {
+    await page.locator('.sort-btn').click();
+    await expectText(page.locator('.sort-btn'), 'Next meeting');
+    const firstWhen = await page.locator('.client-list > .nav-item:not(.nav-link-row) .nav-when').first().textContent();
+    if (!firstWhen || /scheduled|Ad-hoc/.test(firstWhen)) throw new Error(`first client has no upcoming meeting: ${firstWhen}`);
+    await page.locator('.sort-btn').click();
+    await page.locator('.nav-item', { hasText: 'Northwind Health' }).locator('.nav-link').click();
+    await page.getByRole('button', { name: 'Edit planned through' }).click();
+    await page.getByPlaceholder('planned through').fill('1/2/26');
+    await page.keyboard.press('Enter');
+    await page.locator('.plan-flag.passed').waitFor();
+    await page.locator('.tl-tile', { hasText: 'Market data review' }).click();
+    const before = await page.locator('.task-card.done').count();
+    await page.getByLabel('Hide done').check();
+    const after = await page.locator('.task-card.done').count();
+    if (!(before > 0 && after === 0)) throw new Error(`hide done: ${before} → ${after}`);
+    await page.getByLabel('Hide done').uncheck();
   });
 
   await step('demo client page screenshot', async () => {

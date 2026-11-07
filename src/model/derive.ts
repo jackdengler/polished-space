@@ -65,9 +65,41 @@ export function defaultMeeting(c: Client, today = todayIso()): Meeting | null {
   return list.find((m) => !isPastMeeting(m, today)) ?? list[list.length - 1] ?? null;
 }
 
-/** The meeting's title, or else what it covers (its deliverables). */
+/** The meeting's title, or else what it covers ("Peer Group Update +2"). */
 export function meetingLabel(m: Meeting, today?: string): string {
-  return m.title || m.deliverables.map((d) => d.title).join(', ') || `Meeting ${formatFlexShort(m.date, today)}`;
+  if (m.title) return m.title;
+  const [first, ...rest] = m.deliverables;
+  if (first) return rest.length ? `${first.title} +${rest.length}` : first.title;
+  return `Meeting ${formatFlexShort(m.date, today)}`;
+}
+
+/** The next meeting that hasn't fully passed, if any. */
+export const nextMeeting = (c: Client, today = todayIso()): Meeting | null => sortedMeetings(c).find((m) => !isPastMeeting(m, today)) ?? null;
+
+/** What the sidebar shows next to a client. */
+export type Schedule = { kind: 'next'; meeting: Meeting } | { kind: 'notScheduled' } | { kind: 'adhocOnly' };
+export function clientSchedule(c: Client, today = todayIso()): Schedule {
+  const next = nextMeeting(c, today);
+  if (next) return { kind: 'next', meeting: next };
+  return c.meetings.length ? { kind: 'notScheduled' } : { kind: 'adhocOnly' };
+}
+
+/** Sidebar order "by next meeting": soonest first, then not scheduled, then ad-hoc only; A–Z within each. */
+export function compareBySchedule(a: Client, b: Client, today = todayIso()): number {
+  const sa = clientSchedule(a, today), sb = clientSchedule(b, today);
+  const rank = (s: Schedule) => (s.kind === 'next' ? 0 : s.kind === 'notScheduled' ? 1 : 2);
+  return rank(sa) - rank(sb)
+    || (sa.kind === 'next' && sb.kind === 'next' ? compareFlex(sa.meeting.date, sb.meeting.date) : 0)
+    || a.name.localeCompare(b.name);
+}
+
+/** Planned-through status: passed, or ending within 30 days. */
+export function plannedStatus(c: Client, today = todayIso()): { kind: 'passed' | 'soon'; days: number } | null {
+  if (!c.plannedThrough) return null;
+  const days = dayNumber(flexEnd(c.plannedThrough)) - dayNumber(today);
+  if (days < 0) return { kind: 'passed', days: -days };
+  if (days <= 30) return { kind: 'soon', days };
+  return null;
 }
 
 export function initials(name: string): string {

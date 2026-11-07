@@ -4,6 +4,8 @@ import type { Route } from '../router';
 import { useStore } from '../store/store';
 import { embedded } from '../lib/env';
 import { usePersistence } from '../storage/persistence';
+import { setPrefs, usePrefs } from '../prefs';
+import { hostDownloads } from '../lib/claudeRuntime';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 
@@ -29,7 +31,8 @@ export function TopBar({ route }: { route: Route }) {
         <button className="icon-btn" disabled={!canRedo} onClick={() => useStore.getState().redo()} aria-label="Redo" title="Redo (Ctrl+Shift+Z)"><Icon name="redo" size={15} /></button>
         <span className="topbar-sep" />
         <SavePill />
-        <button className="btn btn-sm" onClick={() => (embedded ? setBackup(true) : downloadBackup())}><Icon name="download" size={14} /> Export backup</button>
+        <LastBackup />
+        <button className="btn btn-sm" onClick={() => void exportBackup(() => setBackup(true))}><Icon name="download" size={14} /> Export backup</button>
       </div>
       {backup && <BackupModal onClose={() => setBackup(false)} />}
     </div>
@@ -51,12 +54,41 @@ function SavePill() {
 const backupName = () => `compensian-pm-backup-${todayIso()}.json`;
 const backupText = () => JSON.stringify(useStore.getState().ws, null, 2);
 
-function downloadBackup() {
-  const url = URL.createObjectURL(new Blob([backupText()], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url; a.download = backupName();
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+const markBackedUp = () => setPrefs({ lastBackupAt: new Date().toISOString() });
+
+/**
+ * Full app: a normal download. Hosted page: ask the host to save the file
+ * (the viewer confirms); if it can't, show the copy box.
+ */
+async function exportBackup(showCopyBox: () => void) {
+  if (!embedded) {
+    const url = URL.createObjectURL(new Blob([backupText()], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = backupName();
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    markBackedUp();
+    return;
+  }
+  const downloads = await hostDownloads();
+  if (downloads) {
+    try {
+      await downloads.save({ filename: backupName(), data: backupText() });
+      markBackedUp();
+      return;
+    } catch (e) {
+      if ((e as { code?: string }).code === 'declined' || (e as { code?: string }).code === 'rate_limited') return;
+    }
+  }
+  showCopyBox();
+}
+
+/** "Last backup: 3 days ago", amber when there's none or it's over a week old. */
+function LastBackup() {
+  const at = usePrefs((s) => s.lastBackupAt);
+  const days = at ? Math.floor((Date.now() - Date.parse(at)) / 86_400_000) : null;
+  const text = days === null ? 'No backup yet' : days === 0 ? 'Backed up today' : days === 1 ? 'Backed up yesterday' : `Last backup ${days} days ago`;
+  return <span className={`last-backup${days === null || days > 7 ? ' stale' : ''}`} title="Backups made on this device">{text}</span>;
 }
 
 /** Embedded pages can't download files, so offer the backup as text to copy into a .json file. */
@@ -64,13 +96,13 @@ function BackupModal({ onClose }: { onClose: () => void }) {
   const text = backupText();
   const [copied, setCopied] = useState(false);
   const copy = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    try { await navigator.clipboard.writeText(text); setCopied(true); }
+    try { await navigator.clipboard.writeText(text); setCopied(true); markBackedUp(); }
     catch { (e.currentTarget.closest('.modal')?.querySelector('textarea') as HTMLTextAreaElement | null)?.select(); }
   };
   return (
     <Modal title="Export backup" onClose={onClose} width={520}>
       <p className="modal-text">
-        This page can't download files. Copy the backup and save it as <code>{backupName()}</code> (e.g. in OneDrive).
+        Saving a file isn't available here right now. Copy the backup and save it as <code>{backupName()}</code> (e.g. in OneDrive).
         To restore it later, use <b>Import clients…</b> and pick that file.
       </p>
       <textarea className="backup-text" readOnly value={text} aria-label="Backup data" onFocus={(e) => e.currentTarget.select()} />

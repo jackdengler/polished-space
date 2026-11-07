@@ -77,12 +77,11 @@ export function App() {
   const clients = useStore((s) => s.ws.clients);
   const client = clients.find((c) => c.id === route.clientId);
 
-  // Nothing selected (or the client was deleted) → open the first active client.
+  // Nothing selected (or the client was deleted) → start on This week.
   useEffect(() => {
     if (!adapter || client || route.weekPage) return;
-    const first = [...clients].filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name))[0];
-    if (first) navigate({ clientId: first.id }, { replace: true });
-  }, [adapter, client, clients, route.weekPage]);
+    navigate({ weekPage: true }, { replace: true });
+  }, [adapter, client, route.weekPage]);
 
   if (!adapter) return <Welcome />;
 

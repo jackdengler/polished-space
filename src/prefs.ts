@@ -5,12 +5,16 @@ import { create } from 'zustand';
  * so each person sharing a workspace later can be "me" on their own machine.
  */
 export type Theme = 'system' | 'light' | 'dark';
-interface Prefs { meId: string | null; showWeekend: boolean; hideDone: boolean; theme: Theme }
+export type SidebarSort = 'name' | 'meeting';
+interface Prefs {
+  meId: string | null; showWeekend: boolean; hideDone: boolean; theme: Theme;
+  sidebarSort: SidebarSort; hideDoneTasks: boolean; lastBackupAt: string | null;
+}
 
 const KEY = 'compensian-pm-prefs';
 
 function load(): Prefs {
-  const base: Prefs = { meId: null, showWeekend: false, hideDone: false, theme: 'system' };
+  const base: Prefs = { meId: null, showWeekend: false, hideDone: false, theme: 'system', sidebarSort: 'name', hideDoneTasks: false, lastBackupAt: null };
   try { return { ...base, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return base; }
 }
 

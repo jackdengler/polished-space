@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { closestCenter, DndContext, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { boardProgress, deliverableProgress, deliverablesComplete, meetingLabel } from '../model/derive';
+import { boardProgress, deliverableProgress, deliverablesComplete, isDeliverableComplete, meetingLabel } from '../model/derive';
+import { setPrefs, usePrefs } from '../prefs';
 import { ADHOC, type Client, type Deliverable } from '../model/schema';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
@@ -16,19 +17,25 @@ import { Checkbox, TaskCard } from './TaskCard';
 import { DatePickButton } from './DatePickButton';
 import { formatDue, formatLong, todayIso } from '../model/dates';
 
+/** Indexes are looked up in `ids`, the full list, so reordering works even when some items are hidden. */
 const reorder = (ids: string[], e: DragEndEvent): [number, number] | null => {
   if (!e.over || e.active.id === e.over.id) return null;
   const from = ids.indexOf(String(e.active.id)), to = ids.indexOf(String(e.over.id));
   return from < 0 || to < 0 ? null : [from, to];
 };
 
-function Column({ d, client, highlightTaskId }: { d: Deliverable; client: Client; highlightTaskId: string | null }) {
+function Column({ d, client, highlightTaskId, hideDone }: { d: Deliverable; client: Client; highlightTaskId: string | null; hideDone: boolean }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: d.id });
   const sensors = useSensors(useSensor(SmartPointerSensor, sensorOptions));
   const [adding, setAdding] = useState(false);
   const { addTask, moveTask, renameDeliverable, deleteDeliverable } = useStore.getState();
   const p = deliverableProgress(d);
   const ids = d.tasks.map((t) => t.id);
+  const complete = isDeliverableComplete(d);
+  // Finished deliverables start collapsed; a linked task (from the calendar) opens its column.
+  const [open, setOpen] = useState(() => !complete || d.tasks.some((t) => t.id === highlightTaskId));
+  const collapsed = complete && !open;
+  const shown = hideDone ? d.tasks.filter((t) => !t.done) : d.tasks;
 
   const onDelete = async () => {
     if (d.tasks.length === 0 || await confirmDialog({
@@ -37,23 +44,30 @@ function Column({ d, client, highlightTaskId }: { d: Deliverable; client: Client
   };
 
   return (
-    <div ref={setNodeRef} className={`column${isDragging ? ' dragging' : ''}`} style={{ transform: CSS.Translate.toString(transform), transition }}>
+    <div ref={setNodeRef} className={`column${isDragging ? ' dragging' : ''}${collapsed ? ' collapsed' : ''}`} style={{ transform: CSS.Translate.toString(transform), transition }}>
       <div className="column-head">
         <button ref={setActivatorNodeRef} {...attributes} {...listeners} className="drag-handle" aria-label={`Reorder ${d.title}`} title="Drag to reorder">
           <Icon name="grip" size={14} />
         </button>
         <InlineEdit className="column-title" value={d.title} label="deliverable" onCommit={(v) => renameDeliverable(d.id, v)} />
-        <span className={`column-count${p.total > 0 && p.done === p.total ? ' all-done' : ''}`}>{p.done}/{p.total}</span>
+        {complete
+          ? <button className="column-count all-done" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+              title={open ? 'Collapse this finished deliverable' : 'Show its tasks'}><Icon name="check" size={11} /> {p.done}/{p.total}</button>
+          : <span className="column-count">{p.done}/{p.total}</span>}
         <Menu className="icon-btn" button={<Icon name="more" size={15} />} label="Deliverable actions" items={[
           { label: 'Delete deliverable', danger: true, onSelect: () => void onDelete() },
         ]} />
       </div>
+      {collapsed ? (
+        <button className="collapsed-row" onClick={() => setOpen(true)}>All {p.total} task{p.total === 1 ? '' : 's'} done · Show</button>
+      ) : (<>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]}
         onDragEnd={(e) => { const r = reorder(ids, e); if (r) moveTask(d.id, ...r); }}>
-        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <SortableContext items={shown.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           <div className="column-body">
-            {d.tasks.map((t) => <TaskCard key={t.id} task={t} client={client} highlight={t.id === highlightTaskId} />)}
+            {shown.map((t) => <TaskCard key={t.id} task={t} client={client} highlight={t.id === highlightTaskId} />)}
+            {hideDone && shown.length < d.tasks.length && <div className="hidden-note">{d.tasks.length - shown.length} done hidden</div>}
           </div>
         </SortableContext>
       </DndContext>
@@ -61,6 +75,7 @@ function Column({ d, client, highlightTaskId }: { d: Deliverable; client: Client
       {adding
         ? <AddInput className="task-add" placeholder="Task name, then Enter" onAdd={(v) => addTask(d.id, v)} onDone={() => setAdding(false)} />
         : <button className="add-task-btn" onClick={() => setAdding(true)}><Icon name="plus" size={14} /> Add task</button>}
+      </>)}
     </div>
   );
 }
@@ -75,6 +90,7 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
   const ids = deliverables.map((d) => d.id);
   const p = boardProgress(deliverables);
   const dp = deliverablesComplete(deliverables);
+  const hideDone = usePrefs((s) => s.hideDoneTasks);
 
   const onDeleteMeeting = async () => {
     if (!meeting) return;
@@ -120,6 +136,7 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
           )}
         </div>
         <div className="board-progress">
+          <label className="toggle small-toggle"><input type="checkbox" checked={hideDone} onChange={(e) => setPrefs({ hideDoneTasks: e.target.checked })} /> Hide done</label>
           {dp.total > 0 && <span className="bar wide"><span style={{ width: `${(100 * dp.done) / dp.total}%` }} /></span>}
           <span title={`${p.done} of ${p.total} tasks done`}>{dp.done} of {dp.total} deliverable{dp.total === 1 ? '' : 's'} complete</span>
           {meeting && <Menu className="icon-btn" button={<Icon name="more" size={16} />} label="Meeting actions" items={[
@@ -132,7 +149,7 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
         <DndContext sensors={sensors} collisionDetection={closestCenter}
           onDragEnd={(e) => { const r = reorder(ids, e); if (r) moveDeliverable(client.id, boardId, ...r); }}>
           <SortableContext items={ids} strategy={rectSortingStrategy}>
-            {deliverables.map((d) => <Column key={d.id} d={d} client={client} highlightTaskId={highlightTaskId} />)}
+            {deliverables.map((d) => <Column key={d.id} d={d} client={client} highlightTaskId={highlightTaskId} hideDone={hideDone} />)}
           </SortableContext>
         </DndContext>
         <div className="column ghost">

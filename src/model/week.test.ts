@@ -109,6 +109,27 @@ describe('clientDueStatus', () => {
   });
 });
 
+describe('sidebar schedule', () => {
+  const today = '2026-11-07';
+  const meeting = (id: string, date: string, title = '') => ({ id, createdAt: t0, updatedAt: t0, title, date: { kind: 'exact' as const, date }, kickoff: null,
+    deliverables: [{ id: `d${id}`, createdAt: t0, updatedAt: t0, title: 'Peer group', tasks: [] }, { id: `e${id}`, createdAt: t0, updatedAt: t0, title: 'Trends', tasks: [] }] });
+  it('labels clients and sorts by next meeting', async () => {
+    const { clientSchedule, compareBySchedule, meetingLabel, plannedStatus } = await import('./derive');
+    const soon = client('Soon', [], [], { meetings: [meeting('a', '2026-11-20'), meeting('b', '2026-10-01')] });
+    const later = client('Later', [], [], { meetings: [meeting('c', '2027-01-05')] });
+    const past = client('Past', [], [], { meetings: [meeting('d', '2026-01-05')] });
+    const none = client('Adhoc', [], []);
+    expect(clientSchedule(soon, today)).toMatchObject({ kind: 'next', meeting: { id: 'a' } });
+    expect(clientSchedule(past, today).kind).toBe('notScheduled');
+    expect(clientSchedule(none, today).kind).toBe('adhocOnly');
+    expect([none, past, later, soon].sort((x, y) => compareBySchedule(x, y, today)).map((c) => c.name)).toEqual(['Soon', 'Later', 'Past', 'Adhoc']);
+    expect(meetingLabel(meeting('x', '2026-11-20'))).toBe('Peer group +1');
+    expect(plannedStatus({ ...soon, plannedThrough: { kind: 'exact', date: '2026-11-01' } }, today)).toEqual({ kind: 'passed', days: 6 });
+    expect(plannedStatus({ ...soon, plannedThrough: { kind: 'exact', date: '2026-11-27' } }, today)).toEqual({ kind: 'soon', days: 20 });
+    expect(plannedStatus({ ...soon, plannedThrough: { kind: 'exact', date: '2027-03-01' } }, today)).toBeNull();
+  });
+});
+
 describe('schema defaults', () => {
   it('loads files saved before key tasks and kickoffs existed', () => {
     const old = {

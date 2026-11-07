@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Client } from '../model/schema';
+import { plannedStatus } from '../model/derive';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
 import { usePersistence } from '../storage/persistence';
@@ -17,6 +18,7 @@ export function ClientHeader({ client }: { client: Client }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const teamRef = useRef<HTMLButtonElement>(null);
   const [teamOpen, setTeamOpen] = useState(false);
+  const planned = plannedStatus(client);
   const team = client.teamMemberIds.map((id) => members.find((m) => m.id === id)).filter((m) => m !== undefined);
 
   async function onLogo(file: File | undefined) {
@@ -68,6 +70,11 @@ export function ClientHeader({ client }: { client: Client }) {
             <span className="meta-label">Planned through</span>
             <FlexDateInput value={client.plannedThrough} allowClear label="planned through" placeholder="Set a date"
               onChange={(d) => setPlannedThrough(client.id, d)} />
+            {planned && (
+              <span className={`plan-flag ${planned.kind}`} title={planned.kind === 'passed' ? 'Plan further ahead: the planned-through date has passed.' : 'The planned-through date is coming up.'}>
+                <Icon name="alert" size={12} />{planned.kind === 'passed' ? `Passed ${planned.days}d ago` : planned.days === 0 ? 'Ends today' : `Ends in ${planned.days}d`}
+              </span>
+            )}
           </div>
         </div>
       </div>

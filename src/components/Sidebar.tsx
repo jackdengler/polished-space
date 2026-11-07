@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { addDays, dayNumber, mondayOf, todayIso } from '../model/dates';
 import type { Client } from '../model/schema';
-import { clientDueStatus } from '../model/derive';
+import { clientDueStatus, clientSchedule, compareBySchedule } from '../model/derive';
+import { formatFlexShort } from '../model/flexDate';
 import { setPrefs, usePrefs, type Theme } from '../prefs';
 import { navigate, type Route } from '../router';
 import { useStore } from '../store/store';
@@ -20,17 +21,19 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
   const [showArchived, setShowArchived] = useState(false);
   const me = useMe();
   const myOpen = me ? countMyOpen(clients, me.id) : 0;
+  const sort = usePrefs((s) => s.sidebarSort);
+  const today = todayIso();
   const byName = (a: Client, b: Client) => a.name.localeCompare(b.name);
-  const active = clients.filter((c) => !c.archived).sort(byName);
+  const active = clients.filter((c) => !c.archived).sort(sort === 'meeting' ? (a, b) => compareBySchedule(a, b, today) : byName);
   const archived = clients.filter((c) => c.archived).sort(byName);
   const go = (r: Partial<Route>) => { navigate(r); onNavigate?.(); };
-  const today = todayIso();
 
   const item = (c: Client) => (
     <div key={c.id} className={`nav-item${route.clientId === c.id ? ' active' : ''}`}>
       <a href={`#/c/${c.id}`} className="nav-link" onClick={(e) => { e.preventDefault(); go({ clientId: c.id }); }}>
         <span className="logo-tile"><ClientLogo client={c} size={18} /></span>
         <span className="nav-name">{c.name}</span>
+        {!c.archived && <ScheduleLabel client={c} today={today} />}
         <DueDot client={c} today={today} />
       </a>
     </div>
@@ -56,7 +59,13 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
 
         <div className="section-label">
           <span>Clients</span>
-          <button className="icon-btn tiny" aria-label="New client" title="New client" onClick={() => setAdding(true)}><Icon name="plus" size={14} /></button>
+          <span className="section-actions">
+            <button className="sort-btn" onClick={() => setPrefs({ sidebarSort: sort === 'name' ? 'meeting' : 'name' })}
+              title="Change how clients are sorted" aria-label={`Sorted ${sort === 'name' ? 'A to Z' : 'by next meeting'}. Change`}>
+              <Icon name="sort" size={12} />{sort === 'name' ? 'A–Z' : 'Next meeting'}
+            </button>
+            <button className="icon-btn tiny" aria-label="New client" title="New client" onClick={() => setAdding(true)}><Icon name="plus" size={14} /></button>
+          </span>
         </div>
         {adding && (
           <AddInput className="sidebar-add" placeholder="Client name, then Enter"
@@ -140,4 +149,11 @@ function DueDot({ client, today }: { client: Client; today: string }) {
   const { overdue, thisWeek, nextWeek } = due.counts;
   const parts = [overdue && `${overdue} overdue`, thisWeek && `${thisWeek} due this week`, nextWeek && `${nextWeek} due next week`].filter(Boolean).join(' · ');
   return <span className={`nav-dot ${due.status}`} title={parts} aria-label={parts} />;
+}
+
+/** Next meeting date, or "Not scheduled" / "Ad-hoc only". */
+function ScheduleLabel({ client, today }: { client: Client; today: string }) {
+  const s = clientSchedule(client, today);
+  if (s.kind === 'next') return <span className="nav-when" title="Next meeting">{formatFlexShort(s.meeting.date, today)}</span>;
+  return <span className="nav-when muted" title={s.kind === 'notScheduled' ? 'No upcoming meetings' : 'No meetings, ad-hoc work only'}>{s.kind === 'notScheduled' ? 'Not scheduled' : 'Ad-hoc only'}</span>;
 }
