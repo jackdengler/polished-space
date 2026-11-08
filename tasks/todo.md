@@ -335,3 +335,98 @@ other people's work at my clients.
   - **Restore:** Import restores a backup as one undoable step.
 - **Data:** "(T)" people merged into their base names in the built-in data (51 → 45 people).
 - **Verified:** 51 unit tests, 18 e2e steps (including backup export and restore), and screenshots in light and dark.
+
+---
+
+# Time Tracking — Plan
+
+Status: **DRAFT — awaiting decisions**
+
+Carried over from the old app's spec, simplified as it suggests, with its three bugs fixed and its four hidden features given buttons.
+
+## Data (personal, kept apart from the shared client data)
+- **One flat list of entries:** `{ id, clientId, deliverableId?, taskId?, startISO, endISO, note, openAirTaskId?, dayKey }`.
+  - Exact times; `dayKey` is the local day of the start.
+  - Duration is computed, not stored.
+- **Running timer:** `{ startedAtISO, clientId?, deliverableId?, taskId?, note, openAirTaskId? }`. Nothing is written as an entry until Stop.
+- **Owner:** belongs to "me" (the person picked on this device).
+  - **Storage:** a separate store (its own file in the folder, its own key in the browser), so client files stay clean and a future server can keep time private per person.
+- **OpenAir task list** (Client / Internal / Firm): kept with the workspace settings, editable in a small Settings list. Empty → "No OpenAir tasks yet", with no built-in defaults.
+- **Safety:**
+  - Duplicate IDs dropped on load.
+  - If two timers are somehow found, the newest keeps running and the others are saved as entries.
+  - Time changes save immediately.
+
+## Starting
+- **Quick-start bar** on the Time page:
+  - Client (type-ahead, unique prefix selects).
+  - Deliverable ("Deliverable — Meeting", current meetings plus Ad-hoc).
+  - OpenAir task (tabs).
+  - Note.
+  - Start.
+- **Unknown client name** → creates a normal client (fixes the "temporary client" bug). **New deliverable name** → created in that client's Ad-hoc.
+- **Start with nothing filled in** → a "no client" timer you reassign later.
+- **▶ buttons:** on deliverable headers and task cards ("track time on this"), on Time-page group rows, and **Resume** on past entries (copies deliverable, note and OpenAir task; never edits the old entry).
+- **Starting any timer stops the running one first** and saves it.
+
+## While running
+- **Timer pill in the top bar:** visible on every page, with logo, deliverable or task, and a live clock that ticks on the real second.
+  - **Stop** saves the entry.
+  - **Edit** opens the edit dialog for the running timer.
+- **Live edits:** note, OpenAir task and deliverable update the running timer.
+  - Note saves are debounced, so there's no save per keystroke (fixes bug 2).
+- **Switching client mid-timer:** saves the old stretch as an entry and **restarts the timer at now** on the new client (fixes double-counting).
+- **Survives reloads:** the timer is saved, and keeps counting across a reload or restart.
+
+## Stopping
+- **One stop function used everywhere.** A 0-second timer saves nothing. A timer running past midnight files under its start day.
+- **Deleting or archiving a client with a running timer** asks first and saves the entry.
+- **No fake "Pause":** it's called Stop. Resume starts a new entry.
+
+## Entries list (Time page)
+- **Grouping:** Week (**Saturday–Friday**, "This week" / "Last week" / "Nov 1 – Nov 7") → Day ("Today · …", "Yesterday · …") → group (Client | Deliverable | OpenAir task).
+  - Groups are sorted by client, then OpenAir task (blank last), then deliverable.
+- **Totals:** week, day and group ("1h 5m"). Collapse state is remembered.
+- **Group row actions:** ▶ start (Stop when running) and **Move group…** (change the deliverable or client for all entries at once, previously hidden).
+- **Entry row:**
+  - Start, end and duration.
+  - Note, edited inline with a green "Saved".
+  - **Edit**, **Duplicate** (previously hidden) and **Delete** (two clicks).
+- **+ Add time** (manual entry, previously hidden): client, deliverable, date, start, end, note.
+- **Empty state:** "Start your first timer".
+
+## Edit dialog (past entry or running timer)
+- **Fields:** client, deliverable, OpenAir task, date, start, end.
+- **Times use the local day.** End before start keeps the entry's original length from the new start.
+- **Smart time typing:**
+  - Accepts "9am", "9:30 PM", "14:30".
+  - A bare "9" is read relative to the other time: for an end time, the next 9 after the start; for a start time, the previous 9 before the end. Rolls across midnight if needed.
+- **Running timer:** editing it keeps it running.
+
+## Weekly timesheet
+- **Layout:** rows are client × OpenAir task; columns Sat–Fri, with prev/next week.
+- **Cells:** hours, with notes collected; row, column and grand totals.
+- **Rounding:** None → 0.1h → 0.25h, applied per cell before summing (matches OpenAir entry).
+
+## Day timeline (beside the list)
+- **View:** vertical, latest time at top, ~8 hours visible over a scrollable 24-hour day.
+  - A now line, with auto-scroll to now. Scroll position is kept per day.
+- **Overlaps:** overlapping entries sit side by side.
+- **Colors:** sampled from each client's logo (dominant non-white color), with readable text. Falls back to a stable color from the name.
+- **Controls:** prev/next day and Hide. Hidden by default on narrow screens; the choice is remembered.
+
+## Elsewhere
+- **Time totals:** on meeting cards (timeline tiles) and deliverable headers, e.g. "1h 20m".
+- **Navigation:** Time page in the sidebar; timer pill in the top bar.
+
+## Build checklist
+- [ ] Pure modules + tests: duration formatting, Sat–Fri weeks, grouping/totals, rounding, smart time parser, timer start/stop/switch (no double count), midnight
+- [ ] Personal time store (folder file / browser key) + safety on load
+- [ ] OpenAir task list in settings
+- [ ] Quick-start bar, timer pill, ▶ buttons, Resume
+- [ ] Entries list with groups, totals, inline notes, Edit / Duplicate / Delete, Move group, + Add time
+- [ ] Edit dialog with smart time typing
+- [ ] Weekly timesheet with rounding
+- [ ] Day timeline with logo colors
+- [ ] Time chips on meetings and deliverables
+- [ ] e2e: start → switch client → stop (no double count), edit times, resume, timesheet totals
