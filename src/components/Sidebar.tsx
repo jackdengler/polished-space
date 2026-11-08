@@ -15,6 +15,8 @@ import { ImportClients, type ImportHandle } from './ImportClients';
 import { AddInput } from './InlineEdit';
 import { Popover } from './Popover';
 import { useMe } from './WhoAmI';
+import { OpenAirSettings } from './time/OpenAirSettings';
+import { useTime } from '../time/store';
 
 export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () => void }) {
   const clients = useStore((s) => s.ws.clients);
@@ -62,6 +64,12 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate?: () =
           <span className="logo-tile icon-tile"><Icon name="calendar" size={14} /></span>
           <span className="nav-name">Month</span>
         </a>
+        <a href="#/time" className={`nav-item nav-link-row${route.timePage ? ' active' : ''}`}
+          onClick={(e) => { e.preventDefault(); go({ timePage: true }); }}>
+          <span className="logo-tile icon-tile"><Icon name="clock" size={14} /></span>
+          <span className="nav-name">Time</span>
+          <RunningDot />
+        </a>
         <a href="#/staffing" className={`nav-item nav-link-row${route.staffingPage ? ' active' : ''}`}
           onClick={(e) => { e.preventDefault(); go({ staffingPage: true }); }}>
           <span className="logo-tile icon-tile"><Icon name="users" size={14} /></span>
@@ -107,6 +115,7 @@ function WorkspaceMenu() {
   const ref = useRef<HTMLButtonElement>(null);
   const importRef = useRef<ImportHandle>(null);
   const [open, setOpen] = useState(false);
+  const [oaOpen, setOaOpen] = useState(false);
   const run = (fn: () => void) => { setOpen(false); fn(); };
   return (
     <>
@@ -119,6 +128,7 @@ function WorkspaceMenu() {
         <div role="menu" className="menu">
           <button role="menuitem" className="menu-item" onClick={() => run(openTeamSettings)}><Icon name="users" size={14} /> Team</button>
           <button role="menuitem" className="menu-item" onClick={() => run(() => importRef.current?.open())}><Icon name="inbox" size={14} /> Import clients…</button>
+          <button role="menuitem" className="menu-item" onClick={() => run(() => setOaOpen(true))}><Icon name="clock" size={14} /> OpenAir tasks…</button>
           <div className="menu-sep" />
           <div className="menu-label">Theme</div>
           <div className="seg" role="radiogroup" aria-label="Theme">
@@ -135,6 +145,7 @@ function WorkspaceMenu() {
         </div>
       </Popover>
       <ImportClients ref={importRef} />
+      {oaOpen && <OpenAirSettings onClose={() => setOaOpen(false)} />}
     </>
   );
 }
@@ -167,4 +178,10 @@ function ScheduleLabel({ client, today }: { client: Client; today: string }) {
   const s = clientSchedule(client, today);
   if (s.kind === 'next') return <span className="nav-when" title="Next meeting">{formatFlexShort(s.meeting.date, today)}</span>;
   return <span className="nav-when muted" title={s.kind === 'notScheduled' ? 'No upcoming meetings' : 'No meetings, ad-hoc work only'}>{s.kind === 'notScheduled' ? 'Not scheduled' : 'Ad-hoc only'}</span>;
+}
+
+/** A pulsing dot on "Time" while a timer runs. */
+function RunningDot() {
+  const running = useTime((s) => !!s.timer);
+  return running ? <span className="running-dot" title="A timer is running" aria-label="Timer running" /> : null;
 }

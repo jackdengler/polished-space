@@ -4,6 +4,7 @@ import { ConflictError, type StorageAdapter } from './adapter';
 const DATA_FILE = 'workspace.json';
 const LOGO_DIR = 'logos';
 const BACKUP_DIR = 'backups';
+const PERSONAL_DIR = 'personal';
 const BACKUP_EVERY_MS = 5 * 60_000;
 const BACKUPS_KEPT = 20;
 
@@ -12,6 +13,7 @@ const BACKUPS_KEPT = 20;
  *
  *   my-workspace/
  *     workspace.json
+ *     personal/<personId>.json                 (each person's time entries)
  *     logos/<file>.png
  *     backups/workspace-YYYYMMDD-HHMMSS.json   (last 20)
  *
@@ -93,6 +95,24 @@ export class FolderAdapter implements StorageAdapter {
     await w.write(image);
     await w.close();
     return name;
+  }
+
+  /** personal/<personId>.json — one file per person, never mixed into workspace.json. */
+  async loadPersonal(personId: string): Promise<unknown | null> {
+    try {
+      const dir = await this.dir.getDirectoryHandle(PERSONAL_DIR);
+      return JSON.parse(await (await (await dir.getFileHandle(`${personId}.json`)).getFile()).text());
+    } catch (e) {
+      if ((e as DOMException).name === 'NotFoundError') return null;
+      throw e;
+    }
+  }
+
+  async savePersonal(personId: string, data: unknown): Promise<void> {
+    const dir = await this.dir.getDirectoryHandle(PERSONAL_DIR, { create: true });
+    const w = await (await dir.getFileHandle(`${personId}.json`, { create: true })).createWritable();
+    await w.write(JSON.stringify(data, null, 2) + '\n');
+    await w.close();
   }
 
   async readLogo(name: string): Promise<Blob | null> {

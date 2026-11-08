@@ -8,6 +8,7 @@ import { setPrefs, usePrefs } from '../prefs';
 import { hostDownloads } from '../lib/claudeRuntime';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
+import { TimerPill } from './time/TimerPill';
 
 /** Breadcrumb on the left; undo/redo, where things are saved, and backup on the right. */
 export function TopBar({ route }: { route: Route }) {
@@ -18,7 +19,7 @@ export function TopBar({ route }: { route: Route }) {
   return (
     <div className="topbar">
       <nav className="crumbs" aria-label="Breadcrumb">
-        {route.monthPage ? <span className="crumb-current">Month</span> : route.staffingPage ? <span className="crumb-current">Staffing</span> : route.weekPage ? <span className="crumb-current">This week</span> : client ? (
+        {route.timePage ? <span className="crumb-current">Time</span> : route.monthPage ? <span className="crumb-current">Month</span> : route.staffingPage ? <span className="crumb-current">Staffing</span> : route.weekPage ? <span className="crumb-current">This week</span> : client ? (
           <>
             <span className="crumb">Clients</span>
             <span className="crumb-sep">/</span>
@@ -27,6 +28,7 @@ export function TopBar({ route }: { route: Route }) {
         ) : <span className="crumb-current">Clients</span>}
       </nav>
       <div className="topbar-tools">
+        <TimerPill />
         <button className="icon-btn" disabled={!canUndo} onClick={() => useStore.getState().undo()} aria-label="Undo" title="Undo (Ctrl+Z)"><Icon name="undo" size={15} /></button>
         <button className="icon-btn" disabled={!canRedo} onClick={() => useStore.getState().redo()} aria-label="Redo" title="Redo (Ctrl+Shift+Z)"><Icon name="redo" size={15} /></button>
         <span className="topbar-sep" />

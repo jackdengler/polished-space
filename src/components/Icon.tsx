@@ -27,6 +27,9 @@ const PATHS = {
   download: 'M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14',
   updown: 'M8 9l4-4 4 4M8 15l4 4 4-4',
   sort: 'M7 4v16M3.5 16.5L7 20l3.5-3.5M17 20V4M13.5 7.5L17 4l3.5 3.5',
+  play: 'M8 5.5v13l10.5-6.5z',
+  stop: 'M7 7h10v10H7z',
+  clock: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2',
   week: 'M4 5h16v15H4zM4 9h16M9 9v11M14 9v11M8 3v4M16 3v4',
 } as const;
 
@@ -36,7 +39,7 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={name === 'more' || name === 'grip' ? 3 : 1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={PATHS[name]} fill={name === 'starFilled' ? 'currentColor' : 'none'} />
+      <path d={PATHS[name]} fill={name === 'starFilled' || name === 'play' || name === 'stop' ? 'currentColor' : 'none'} />
     </svg>
   );
 }

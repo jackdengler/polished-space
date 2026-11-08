@@ -28,6 +28,17 @@ export class MemoryAdapter implements StorageAdapter {
     return name;
   }
 
+  private personal = new Map<string, unknown>();
+  async loadPersonal(personId: string) {
+    if (this.personal.has(personId)) return this.personal.get(personId)!;
+    if (!this.storageKey) return null;
+    try { const t = localStorage.getItem(`${this.storageKey}:personal:${personId}`); return t ? JSON.parse(t) : null; } catch { return null; }
+  }
+  async savePersonal(personId: string, data: unknown) {
+    this.personal.set(personId, data);
+    if (this.storageKey) store(`${this.storageKey}:personal:${personId}`, JSON.stringify(data));
+  }
+
   async readLogo(name: string) {
     const hit = this.logos.get(name);
     if (hit) return hit;
@@ -60,6 +71,6 @@ export function loadSavedBrowserWorkspace(key: string): Workspace | null {
 /** Erase the saved copy and its logos. */
 export function clearSavedBrowserWorkspace(key: string) {
   try {
-    for (const k of Object.keys(localStorage)) if (k === key || k.startsWith(`${key}:logo:`)) localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k === key || k.startsWith(`${key}:logo:`) || k.startsWith(`${key}:personal:`)) localStorage.removeItem(k);
   } catch { /* nothing to clear */ }
 }

@@ -21,8 +21,11 @@ From the user's checklist of the old app (branch `cleanup/single-user-refresh`).
 - [x] Due dates: type (with snapping, weekdays, today/tomorrow) or pick from a calendar
 - [x] Multiple people per task; auto-matched names pick up roles
 
+## Done
+- [x] Time tracking (see tasks/todo.md)
+
 ## Next
-- Time tracking (to discuss: timer, OpenAir tasks, timesheet, day timeline)
+- Load the OpenAir task list once the user pastes it (to discuss: timer, OpenAir tasks, timesheet, day timeline)
 
 ## Later / eventually
 - PTO + coverage

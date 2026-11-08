@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Client } from '../model/schema';
 import { byRoleThenName, plannedStatus } from '../model/derive';
+import { time, useTime } from '../time/store';
 import { navigate } from '../router';
 import { useStore } from '../store/store';
 import { usePersistence } from '../storage/persistence';
@@ -34,13 +35,22 @@ export function ClientHeader({ client }: { client: Client }) {
     }
   }
 
+  async function onArchive() {
+    if (!client.archived && useTime.getState().timer?.clientId === client.id) {
+      if (!await confirmDialog({ title: `Archive ${client.name}?`, message: 'Your running timer on this client will be stopped and saved first.', confirmLabel: 'Stop timer and archive' })) return;
+      time.stopIfOnClient(client.id);
+    }
+    setArchived(client.id, !client.archived);
+  }
+
   async function onDelete() {
+    const timing = useTime.getState().timer?.clientId === client.id;
     const ok = await confirmDialog({
       title: `Delete ${client.name}?`,
-      message: 'This deletes the client and all of its meetings, deliverables and tasks. You can undo right after, but consider archiving instead.',
+      message: `This deletes the client and all of its meetings, deliverables and tasks. You can undo right after, but consider archiving instead.${timing ? ' Your running timer on this client will be stopped and saved first.' : ''}`,
       confirmLabel: 'Delete client', danger: true,
     });
-    if (ok) { deleteClient(client.id); navigate({}); }
+    if (ok) { time.stopIfOnClient(client.id); deleteClient(client.id); navigate({}); }
   }
 
   return (
@@ -82,7 +92,7 @@ export function ClientHeader({ client }: { client: Client }) {
       <Menu button={<Icon name="more" size={18} />} label="Client actions" items={[
         { label: 'Change logo', onSelect: () => fileRef.current?.click() },
         { label: 'Remove logo', hidden: !client.logo, onSelect: () => setClientLogo(client.id, null) },
-        { label: client.archived ? 'Unarchive client' : 'Archive client', onSelect: () => setArchived(client.id, !client.archived) },
+        { label: client.archived ? 'Unarchive client' : 'Archive client', onSelect: () => void onArchive() },
         { label: 'Delete client…', danger: true, onSelect: () => void onDelete() },
       ]} />
     </header>

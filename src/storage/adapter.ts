@@ -16,6 +16,9 @@ export interface StorageAdapter {
   /** Store a logo image; returns the file name to keep on the client. */
   writeLogo(clientId: string, image: Blob): Promise<string>;
   readLogo(fileName: string): Promise<Blob | null>;
+  /** Personal data for one person (e.g. their time entries), kept apart from the shared workspace. */
+  loadPersonal(personId: string): Promise<unknown | null>;
+  savePersonal(personId: string, data: unknown): Promise<void>;
 }
 
 export class ConflictError extends Error {

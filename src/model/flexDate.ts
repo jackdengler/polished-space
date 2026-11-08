@@ -64,8 +64,11 @@ export function snapYear(month: number, day: number, today: string = todayIso())
 
 /** Parse free text into a FlexDate. Returns null if it isn't understood. Yearless dates snap (see snapYear). */
 export function parseFlexDate(input: string, today: string = todayIso()): FlexDate | null {
-  const s = input.trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ');
+  let s = input.trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ');
   if (!s) return null;
+  // A leading weekday is just decoration when a date follows ("Sun Nov 8", "Tue 11/12").
+  const dated = s.match(/^(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\.? (.+)$/);
+  if (dated && !/^(next )/.test(s)) s = dated[1]!;
   let m: RegExpMatchArray | null;
 
   // 2026-10-28

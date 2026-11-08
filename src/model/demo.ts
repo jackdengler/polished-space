@@ -164,5 +164,8 @@ export function makeDemoWorkspace(today: string = todayIso()): Workspace {
     ], [], true),
   ];
 
-  return { schemaVersion: SCHEMA_VERSION, teamMembers: team, clients };
+  const openAirTasks = (['Client', 'Internal', 'Firm'] as const).flatMap((group, gi) =>
+    (group === 'Client' ? ['Analysis', 'Meetings', 'Project management'] : group === 'Internal' ? ['Training', 'Admin'] : ['Firm meeting'])
+      .map((name, i) => ({ id: `demo-oa-${gi}-${i}`, name, group })));
+  return { schemaVersion: SCHEMA_VERSION, teamMembers: team, clients, settings: { openAirTasks } };
 }

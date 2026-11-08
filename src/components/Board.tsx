@@ -4,6 +4,8 @@ import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingS
 import { CSS } from '@dnd-kit/utilities';
 import { boardProgress, deliverableProgress, deliverablesComplete, isDeliverableComplete, meetingLabel, tasksAsText } from '../model/derive';
 import { showToast } from '../ui';
+import { time, useTime } from '../time/store';
+import { durationMs, formatTotal } from '../time/model';
 import { setPrefs, usePrefs } from '../prefs';
 import { ADHOC, type Client, type Deliverable } from '../model/schema';
 import { navigate } from '../router';
@@ -68,6 +70,7 @@ function Column({ d, client, highlightTaskId, hideDone }: { d: Deliverable; clie
           <Icon name="grip" size={14} />
         </button>
         <InlineEdit className="column-title" value={d.title} label="deliverable" onCommit={(v) => renameDeliverable(d.id, v)} />
+        <DeliverableTime clientId={client.id} deliverableId={d.id} />
         {complete
           ? <button className="column-count all-done" onClick={() => setOpen((o) => !o)} aria-expanded={open}
               title={open ? 'Collapse this finished deliverable' : 'Show its tasks'}><Icon name="check" size={11} /> {p.done}/{p.total}</button>
@@ -180,5 +183,22 @@ export function Board({ client, boardId, highlightTaskId }: { client: Client; bo
         </div>
       </div>
     </section>
+  );
+}
+
+/** Total tracked time on a deliverable, and ▶ to start a timer on it. */
+function DeliverableTime({ clientId, deliverableId }: { clientId: string; deliverableId: string }) {
+  const ms = useTime((s) => s.entries.reduce((n, e) => (e.deliverableId === deliverableId ? n + durationMs(e) : n), 0));
+  const running = useTime((s) => s.timer?.deliverableId === deliverableId);
+  const ready = useTime((s) => s.status === 'ready');
+  if (!ready) return null;
+  return (
+    <>
+      {ms > 0 && <span className="time-chip" title="Time tracked on this deliverable">{formatTotal(ms)}</span>}
+      <button className={`icon-btn track-btn${running ? ' on' : ''}`} aria-label={running ? 'Stop timer' : 'Track time on this deliverable'}
+        title={running ? 'Stop timer' : 'Track time on this'} onClick={() => (running ? time.stop() : time.start({ clientId, deliverableId }))}>
+        <Icon name={running ? 'stop' : 'play'} size={11} />
+      </button>
+    </>
   );
 }

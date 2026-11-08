@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { produce, type Draft } from 'immer';
 import type { FlexDate } from '../model/flexDate';
-import { ADHOC, emptyWorkspace, type BoardId, type Client, type Deliverable, type Role, type Task, type TeamMember, type Workspace } from '../model/schema';
+import { ADHOC, emptyWorkspace, type BoardId, type Client, type Deliverable, type OpenAirTask, type Role, type Task, type TeamMember, type Workspace } from '../model/schema';
 import { cleanName } from '../model/derive';
 import { MEMBER_COLORS } from '../model/derive';
 
@@ -93,6 +93,9 @@ export interface Store {
   deleteMember(id: string): void;
   /** Combine two entries for the same person: `fromId`'s tasks and client teams move to `intoId`. */
   mergeMember(fromId: string, intoId: string): void;
+
+  /** Replace the OpenAir task list (Settings). */
+  setOpenAirTasks(tasks: OpenAirTask[]): void;
 
   // Clients
   /** Add imported clients and any new team members in one step. */
@@ -191,6 +194,8 @@ export const useStore = create<Store>()((set, get) => {
         if (t.keyFor.includes(id)) t.keyFor = t.keyFor.filter((x) => x !== id);
       }
     }),
+
+    setOpenAirTasks: (tasks) => mutate((ws) => { ws.settings.openAirTasks = tasks; }),
 
     importClients: (clients, newMembers) => mutate((ws) => {
       ws.teamMembers.push(...newMembers);

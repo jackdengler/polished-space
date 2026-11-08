@@ -11,6 +11,8 @@ import { TopBar } from './components/TopBar';
 import { WeekPage } from './components/WeekPage';
 import { StaffingPage } from './components/StaffingPage';
 import { MonthPage } from './components/MonthPage';
+import { TimePage } from './components/time/TimePage';
+import { flushTime, initTime } from './time/store';
 import { WhoAmIModal } from './components/WhoAmI';
 import { navigate, useRoute } from './router';
 import { useStore } from './store/store';
@@ -26,12 +28,15 @@ function useGlobalKeys() {
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); useStore.getState().undo(); }
       else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); useStore.getState().redo(); }
     };
+    const onHide = () => { if (document.visibilityState === 'hidden') flushTime(); };
+    document.addEventListener('visibilitychange', onHide);
     const onUnload = (e: BeforeUnloadEvent) => {
+      flushTime();
       if (usePersistence.getState().adapter?.kind === 'folder' && hasUnsavedChanges()) { void flush(); e.preventDefault(); }
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('beforeunload', onUnload);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('beforeunload', onUnload); };
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('beforeunload', onUnload); document.removeEventListener('visibilitychange', onHide); };
   }, []);
 }
 
@@ -87,9 +92,14 @@ export function App() {
 
   // Nothing selected (or the client was deleted) → start on This week.
   useEffect(() => {
-    if (!adapter || client || route.weekPage || route.staffingPage || route.monthPage) return;
+    if (!adapter || client || route.weekPage || route.staffingPage || route.monthPage || route.timePage) return;
     navigate({ weekPage: true }, { replace: true });
-  }, [adapter, client, route.weekPage, route.staffingPage, route.monthPage]);
+  }, [adapter, client, route.weekPage, route.staffingPage, route.monthPage, route.timePage]);
+
+  // Load this person's time whenever the workspace or "me" changes.
+  const meId = usePrefs((s) => s.meId);
+  const meExists = useStore((s) => s.ws.teamMembers.some((m) => m.id === meId));
+  useEffect(() => { void initTime(adapter, meExists ? meId : null); }, [adapter, meId, meExists]);
 
   if (!adapter) return <Welcome />;
 
@@ -101,7 +111,9 @@ export function App() {
         <button className="nav-toggle icon-btn" aria-label="Open navigation" onClick={() => setNavOpen(true)}><Icon name="menu" size={18} /></button>
         <TopBar route={route} />
         <Banners />
-        {route.staffingPage
+        {route.timePage
+          ? <TimePage />
+          : route.staffingPage
           ? <StaffingPage />
           : route.monthPage
           ? <MonthPage month={route.month ?? null} />

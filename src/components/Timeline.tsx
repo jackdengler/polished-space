@@ -11,6 +11,8 @@ import { useStore } from '../store/store';
 import { FlexDateField } from './FlexDateInput';
 import { Icon } from './Icon';
 import { Popover } from './Popover';
+import { useTime } from '../time/store';
+import { durationMs, formatTotal } from '../time/model';
 
 const TILE_W = 150;
 const STEM = 14; // the tile's stem sits this far in from its left edge
@@ -112,6 +114,7 @@ export function Timeline({ client, boardId }: { client: Client; boardId: string 
                     {openPast && <span className="warn-dot" aria-label="Past meeting with open tasks" />}
                   </span>
                   <span className={`tl-tile-title${m.title ? '' : ' derived'}`}>{meetingLabel(m, today)}</span>
+                  <MeetingTime ids={m.deliverables.map((d) => d.id)} />
                   <span className={`tl-tile-progress${complete ? ' complete' : ''}`} title={`${dp.done} of ${dp.total} deliverables complete · ${p.done} of ${p.total} tasks done`}>
                     {dp.total ? `${dp.done}/${dp.total} deliverable${dp.total === 1 ? '' : 's'}` : 'No deliverables yet'}
                   </span>
@@ -189,4 +192,10 @@ function AddMeetingButton({ client }: { client: Client }) {
       </Popover>
     </>
   );
+}
+
+/** Total tracked time across a meeting's deliverables. */
+function MeetingTime({ ids }: { ids: string[] }) {
+  const ms = useTime((s) => s.entries.reduce((n, e) => (e.deliverableId && ids.includes(e.deliverableId) ? n + durationMs(e) : n), 0));
+  return ms > 0 ? <span className="tl-time" title="Time tracked">{formatTotal(ms)}</span> : null;
 }

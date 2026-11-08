@@ -366,6 +366,57 @@ try {
     await page.keyboard.press('Escape');
   });
 
+  await step('time tracking: start, switch client (no double count), stop, edit, resume, timesheet, reload', async () => {
+    await page.locator('.nav-link-row', { hasText: 'Time' }).click();
+    await page.getByText('Start your first timer').waitFor();
+    await page.getByLabel('Client', { exact: true }).fill('Northwind Health');
+    await page.getByLabel('OpenAir task', { exact: true }).first().selectOption({ label: 'Analysis' });
+    await page.getByLabel('Note', { exact: true }).first().fill('market data');
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.locator('.timer-pill', { hasText: 'Northwind Health' }).waitFor();
+    await page.waitForTimeout(1300);
+    // Switch client while running: the Northwind stretch is saved and the timer restarts on Summit.
+    await page.getByLabel('Client', { exact: true }).fill('Summit Credit Union');
+    await page.getByLabel('Note', { exact: true }).first().click(); // blur the client field
+    await page.locator('.timer-pill', { hasText: 'Summit Credit Union' }).waitFor();
+    await page.waitForTimeout(1300);
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    await page.locator('.timer-pill').waitFor({ state: 'detached' });
+    await page.locator('.te-group', { hasText: 'Northwind Health' }).waitFor();
+    await page.locator('.te-group', { hasText: 'Summit Credit Union' }).waitFor();
+    const groups = await page.locator('.te-group').count();
+    if (groups !== 2) throw new Error(`expected 2 groups, got ${groups}`);
+
+    // Edit times with smart typing: 9 → 10:30 is 1h 30m.
+    const nw = page.locator('.te-group', { hasText: 'Northwind Health' });
+    await nw.locator('.te-group-toggle').click();
+    await nw.getByRole('button', { name: 'Reassign or edit date and times' }).click();
+    await page.getByLabel('Start', { exact: true }).fill('9');
+    await page.getByLabel('End', { exact: true }).fill('10:30');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expectText(page.locator('.te-group', { hasText: 'Northwind Health' }).locator('.te-group-toggle .te-total'), '1h 30m');
+
+    // Resume starts a new timer like that entry; stop it again.
+    await page.locator('.te-group', { hasText: 'Northwind Health' }).getByRole('button', { name: 'Resume' }).click();
+    await page.locator('.timer-pill', { hasText: 'Northwind Health' }).waitFor();
+    await page.locator('.tp-stop').click();
+
+    // Timesheet shows the hours (1.5h for Northwind on today's column).
+    await page.getByRole('button', { name: 'Weekly timesheet' }).click();
+    await page.locator('.ts-table tbody tr', { hasText: 'Northwind Health' }).waitFor();
+    await expectText(page.locator('.ts-table tbody tr', { hasText: 'Northwind Health' }).locator('td').last(), '1.5');
+    await page.getByRole('button', { name: /Rounding/ }).click();
+    await expectText(page.getByRole('button', { name: /Rounding/ }), '0.1h');
+    await page.keyboard.press('Escape');
+
+    // Time is personal data in its own file and survives a reload.
+    await page.waitForTimeout(600);
+    await page.reload();
+    await page.getByRole('button', { name: 'Use test storage' }).click();
+    await page.locator('.nav-link-row', { hasText: 'Time' }).click();
+    await page.locator('.te-group', { hasText: 'Northwind Health' }).waitFor();
+  });
+
   await step('demo client page screenshot', async () => {
     await page.locator('.nav-item', { hasText: 'Northwind Health' }).click();
     await page.locator('.tl-tile.selected').waitFor();

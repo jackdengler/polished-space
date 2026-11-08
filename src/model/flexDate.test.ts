@@ -56,6 +56,7 @@ describe('smart year snapping', () => {
   it.each([
     ['today', '2026-11-07'], ['tomorrow', '2026-11-08'], ['fri', '2026-11-13'], ['Monday', '2026-11-09'],
     ['sat', '2026-11-07'], ['next sat', '2026-11-14'],
+    ['Sun Nov 8', '2026-11-08'], ['Tue 11/10', '2026-11-10'], ['Mon Jan 4, 2027', '2027-01-04'],
   ])('%s → %s', (input, iso) => {
     expect(parseFlexDate(input, nov7)).toEqual({ kind: 'exact', date: iso });
   });

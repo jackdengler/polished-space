@@ -340,7 +340,7 @@ other people's work at my clients.
 
 # Time Tracking — Plan
 
-Status: **DRAFT — awaiting decisions**
+Status: **BUILT** (decisions: client, deliverable and OpenAir are each optional; timer pill in the top bar; OpenAir list to be pasted by the user)
 
 Carried over from the old app's spec, simplified as it suggests, with its three bugs fixed and its four hidden features given buttons.
 
@@ -420,13 +420,13 @@ Carried over from the old app's spec, simplified as it suggests, with its three 
 - **Navigation:** Time page in the sidebar; timer pill in the top bar.
 
 ## Build checklist
-- [ ] Pure modules + tests: duration formatting, Sat–Fri weeks, grouping/totals, rounding, smart time parser, timer start/stop/switch (no double count), midnight
-- [ ] Personal time store (folder file / browser key) + safety on load
-- [ ] OpenAir task list in settings
-- [ ] Quick-start bar, timer pill, ▶ buttons, Resume
-- [ ] Entries list with groups, totals, inline notes, Edit / Duplicate / Delete, Move group, + Add time
-- [ ] Edit dialog with smart time typing
-- [ ] Weekly timesheet with rounding
-- [ ] Day timeline with logo colors
-- [ ] Time chips on meetings and deliverables
-- [ ] e2e: start → switch client → stop (no double count), edit times, resume, timesheet totals
+- [x] Pure modules + tests: duration formatting, Sat–Fri weeks, grouping/totals, rounding, smart time parser, timer start/stop/switch (no double count), midnight
+- [x] Personal time store (folder file / browser key) + safety on load
+- [x] OpenAir task list in settings
+- [x] Quick-start bar, timer pill, ▶ buttons, Resume
+- [x] Entries list with groups, totals, inline notes, Edit / Duplicate / Delete, Move group, + Add time
+- [x] Edit dialog with smart time typing
+- [x] Weekly timesheet with rounding
+- [x] Day timeline with logo colors
+- [x] Time chips on meetings and deliverables
+- [x] e2e: start → switch client → stop (no double count), edit times, resume, timesheet totals

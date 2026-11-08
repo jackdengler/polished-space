@@ -77,10 +77,16 @@ export const TeamMemberSchema = z.object({
   role: z.enum(ROLES).default('Unassigned'),
 });
 
+export const OPENAIR_GROUPS = ['Client', 'Internal', 'Firm'] as const;
+export const OpenAirTaskSchema = z.object({ id: z.string(), name: z.string(), group: z.enum(OPENAIR_GROUPS) });
+export type OpenAirTask = z.infer<typeof OpenAirTaskSchema>;
+
 export const WorkspaceSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   teamMembers: z.array(TeamMemberSchema),
   clients: z.array(ClientSchema),
+  /** Shared settings (the OpenAir task list for time tracking). */
+  settings: z.object({ openAirTasks: z.array(OpenAirTaskSchema).default([]) }).default({ openAirTasks: [] }),
 });
 
 export type Subtask = z.infer<typeof SubtaskSchema>;
@@ -95,7 +101,7 @@ export type Workspace = z.infer<typeof WorkspaceSchema>;
 export const ADHOC = 'adhoc';
 export type BoardId = string; // a meeting id, or ADHOC
 
-export const emptyWorkspace = (): Workspace => ({ schemaVersion: SCHEMA_VERSION, teamMembers: [], clients: [] });
+export const emptyWorkspace = (): Workspace => ({ schemaVersion: SCHEMA_VERSION, teamMembers: [], clients: [], settings: { openAirTasks: [] } });
 
 /** Validate data read from disk. Throws a readable error. */
 export function parseWorkspace(data: unknown): Workspace {
