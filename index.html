@@ -443,6 +443,9 @@ async function loadRemote(conditional=false){
   if(res.status===304){ setSync(sync.pending?'pending':'ok', sync.pending?'Saved offline':'Synced'); return; }   // unchanged — fast, doesn't count against rate limit
   if(res.status===404){ sync.sha=null; sync.etag=null; setSync('ok','Synced'); return; }
   if(!res.ok){ const e=new Error(`GET ${res.status}`); e.status=res.status; setSync('err', res.status===401?'Token expired':'Sync error'); throw e; }
+  // A background refresh must never overwrite edits made while it was in flight —
+  // leave sha untouched so the pending save hits a conflict and merges properly.
+  if(conditional && (sync.dirty||sync.pending||sync.saving)) return;
   const json=await res.json();
   applyRemote(JSON.parse(b64decode(json.content)));
   sync.sha=json.sha; sync.etag=res.headers.get('ETag')||null; sync.lastSync=Date.now();
@@ -463,7 +466,7 @@ async function saveRemote(message){
     }
     if(res.ok){
       const json=await res.json();
-      sync.sha=json.content.sha; sync.etag=null; sync.lastSync=Date.now(); sync.pending=false; persistLocal(); setSync('ok','Synced'); return;
+      sync.sha=json.content.sha; sync.etag=null; sync.lastSync=Date.now(); sync.pending=sync.dirty; persistLocal(); setSync(sync.dirty?'pending':'ok', sync.dirty?'Saving…':'Synced'); return;
     }
     if(res.status===409||res.status===422){
       // remote moved on: reload its sha, keep our plan edits + UNION the logs so no check is lost, retry
@@ -494,7 +497,7 @@ function scheduleSave(message){
   sync.saveTimer=setTimeout(flushSave,SAVE_DEBOUNCE_MS);
 }
 async function flushSave(){
-  if(!sync.token||!sync.dirty||sync.saving) return;
+  if(!sync.token||!(sync.dirty||sync.pending)||sync.saving) return;
   sync.saving=true; sync.dirty=false;
   try{ await saveRemote(sync.lastMsg); sync.failed=false; }
   catch(err){
@@ -756,7 +759,7 @@ document.addEventListener('click', e=>{
   if(currentTab==='track') renderTrack();
 });
 
-function toast(m){ const e=document.getElementById('toast'); e.textContent=m; e.classList.add('show'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('show'),1900); }
+function toast(m){ const e=document.getElementById('toast'); e.textContent=m; e.classList.add('show'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('show'),Math.max(1900,m.length*60)); }
 
 /* ─────────────────────────  Setup / settings  ───────────────────────── */
 const setupEl=document.getElementById('setup');
@@ -820,7 +823,7 @@ window.addEventListener('online', ()=>{
   showApp(); startPolling();
   try{ await syncNow(); }
   catch(err){
-    if(err && err.status===401){ showSetup("Your token expired — paste a new one to keep syncing."); }
+    if(err && err.status===401){ stopPolling(); showSetup("Your token expired — paste a new one to keep syncing."); }
     // otherwise we're offline / GitHub unreachable: stay in the app on local data;
     // polling + retry will upload once the connection (or a fixed token) is back.
   }

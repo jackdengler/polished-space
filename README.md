@@ -9,8 +9,9 @@ read/written via the GitHub Contents API using a token you paste once per device
 ## What it does
 
 - Sectioned chore checklists (Daily / As needed / Weekly / Monthly).
-- Assign each task to **Jack**, **Jordan**, or **Both** — a balance beam shows
-  who's carrying more.
+- Assign each task to **Jack**, **Jordan**, **Both** (you each do it) or
+  **Either** (only one of you has to) — a balance beam shows who's carrying more.
+- Switch to **Track** to check things off; it logs who did what, by day.
 - Open a task to set its standard: steps start maximal, tap × to cut what you
   don't do, or add your own. Tick steps off as you clean.
 - Copy or download a plain-text snapshot anytime.
@@ -22,7 +23,10 @@ read/written via the GitHub Contents API using a token you paste once per device
 - Assignments and checked-off steps are saved (debounced) on every change, so
   both phones stay in sync. Each save is a commit in `private-data-storage`.
 - The token is stored only in your browser's `localStorage` and only sent to `api.github.com`.
-- Both devices poll every 30s, so changes show up on the other person's phone.
+- Both devices poll every few seconds (cheap conditional requests), so changes
+  show up on the other person's phone almost immediately.
+- Edits are cached on the device first, so the app works offline and uploads
+  when the connection returns.
 
 ## Setup
 
