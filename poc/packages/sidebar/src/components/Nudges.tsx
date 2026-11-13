@@ -20,10 +20,7 @@ function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: S
   const n = suggestions.length;
   const regionId = `nudge-${nudge.id}-suggestions`;
 
-  let act: { label: string; run: () => void; controls?: string } | null = null;
-  if (n > 0) act = { label: expanded ? 'Hide' : n === 1 ? 'Review suggestion' : `Review ${n} suggestions`, run: () => toggle(nudge.id), controls: regionId };
-  else if (nudge.taskId && taskExists) act = { label: 'Open task', run: () => open({ kind: 'task', taskId: nudge.taskId! }) };
-
+  const canOpen = Boolean(nudge.taskId && taskExists);
   return (
     <li className={`nudge nudge-${nudge.kind}`} data-nudge-id={nudge.id}>
       <div className="nudge-row">
@@ -44,10 +41,15 @@ function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: S
         </div>
       </div>
       <div className="nudge-actions">
-        {act ? (
-          <button type="button" className="btn btn-sm btn-accent-soft" onClick={act.run} aria-expanded={act.controls ? expanded : undefined} aria-controls={act.controls}>
-            {act.label}
-            {act.controls ? <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={13} /> : <Icon name="chevronRight" size={13} />}
+        {n > 0 ? (
+          <button type="button" className="btn btn-sm btn-accent-soft" onClick={() => toggle(nudge.id)} aria-expanded={expanded} aria-controls={regionId} aria-label={expanded ? 'Hide suggestions' : `Review ${n} suggestion${n > 1 ? 's' : ''}`}>
+            {expanded ? 'Hide' : `Review ${n}`}
+            <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={13} />
+          </button>
+        ) : null}
+        {canOpen ? (
+          <button type="button" className={`btn btn-sm ${n > 0 ? 'btn-ghost' : 'btn-accent-soft'}`} onClick={() => open({ kind: 'task', taskId: nudge.taskId! })}>
+            Open task
           </button>
         ) : null}
         <button type="button" className="btn btn-sm btn-ghost" disabled={chatBusy} onClick={() => void sendChat(`Tell me more about this: ${nudge.text}`)}>

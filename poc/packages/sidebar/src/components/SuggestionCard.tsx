@@ -21,7 +21,9 @@ export function useAllTasks(): SidebarTask[] {
 
 function useClientName(): (id: string | null | undefined) => string | null {
   const clients = useUi((s) => s.state?.clients);
-  return (id) => (id ? (clients?.find((c) => c.id === id)?.name ?? id) : null);
+  const tasks = useAllTasks();
+  // The client list is "active clients for the picker"; fall back to a task's clientName (e.g. Internal).
+  return (id) => (id ? (clients?.find((c) => c.id === id)?.name ?? tasks.find((t) => t.clientId === id)?.clientName ?? 'Unknown client') : null);
 }
 
 export function ClientTag({ name, low }: { name: string | null; low?: boolean }) {
@@ -105,7 +107,9 @@ function Details({ s, tasks, variant }: { s: Suggestion; tasks: SidebarTask[]; v
         <p className="sg-detail">
           {s.payload.alias ? <>Who is “{s.payload.alias}”? </> : null}
           {s.payload.relatedSuggestionIds.length
-            ? `${s.payload.relatedSuggestionIds.length} suggestion${s.payload.relatedSuggestionIds.length > 1 ? 's' : ''} wait on this.`
+            ? s.payload.relatedSuggestionIds.length === 1
+              ? 'One suggestion waits on this.'
+              : `${s.payload.relatedSuggestionIds.length} suggestions wait on this.`
             : null}
         </p>
       );

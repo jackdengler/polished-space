@@ -43,7 +43,9 @@ export interface AnthropicLike {
  * here. Returns null when no credentials are configured, so the brain still
  * starts and every call fails with a clear ClaudeUnavailableError.
  */
-export function createAnthropicClient(config: Pick<BrainConfig, 'anthropicBaseUrl'>): AnthropicLike | null {
+export function createAnthropicClient(config: Pick<BrainConfig, 'anthropicBaseUrl'>, env: NodeJS.ProcessEnv = process.env): AnthropicLike | null {
+  // The SDK constructs fine without credentials and only fails per request, so check up front.
+  if (!env.ANTHROPIC_API_KEY && !env.ANTHROPIC_AUTH_TOKEN && !env.ANTHROPIC_PROFILE) return null;
   try {
     return new Anthropic(config.anthropicBaseUrl ? { baseURL: config.anthropicBaseUrl } : {}) as unknown as AnthropicLike;
   } catch {

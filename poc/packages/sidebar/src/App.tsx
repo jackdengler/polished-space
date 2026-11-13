@@ -23,7 +23,12 @@ function Header() {
   const tab = useUi((s) => s.tab);
   const setTab = useUi((s) => s.setTab);
   const overlay = useUi((s) => s.overlay);
-  const openCount = useUi((s) => s.state?.suggestions.filter((x) => x.status === 'pending' || x.status === 'failed').length ?? 0);
+  // Suggestions waiting for a decision, not counting prepared work (that lives on its task).
+  const openCount = useUi((s) => {
+    if (!s.state) return 0;
+    const a = arrange(s.state, [], []);
+    return a.inbox.length + a.loose.length + a.nudges.reduce((n, x) => n + x.suggestions.length, 0);
+  });
 
   const next = useMemo(() => {
     if (!state) return null;

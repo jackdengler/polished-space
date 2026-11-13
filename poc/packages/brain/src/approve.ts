@@ -37,7 +37,7 @@ export class Approver {
     const parsed = ApproveBody.safeParse(body ?? {});
     if (!parsed.success) throw new HttpProblem(400, `invalid approve body: ${parsed.error.message}`);
     const edits = parsed.data.edits ?? {};
-    const next = structuredClone(current) as Suggestion & { payload: Record<string, unknown> };
+    const next = structuredClone(current) as unknown as Omit<Suggestion, 'payload'> & { payload: Record<string, unknown> };
     if (edits.title) next.title = edits.title;
     if (edits.clientId) {
       const clients = await this.d.clients();

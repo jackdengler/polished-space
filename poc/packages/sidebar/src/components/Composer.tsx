@@ -64,7 +64,7 @@ export function Composer() {
             ref={ref}
             className="composer-input"
             rows={rows}
-            placeholder={showPartial ? '' : voiceOn ? 'Speak, or type here…' : 'Ask, or add a task: “chase Michael on Friday”'}
+            placeholder={showPartial ? '' : voiceOn ? 'Speak, or type here…' : 'Ask anything, or add a task…'}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}

@@ -18,12 +18,18 @@ export interface HttpOptions {
 }
 
 export async function http(url: string, opts: HttpOptions = {}): Promise<Response> {
-  const res = await fetch(url, {
-    method: opts.method ?? 'GET',
-    headers: opts.body !== undefined ? { 'content-type': 'application/json', accept: 'application/json' } : { accept: 'application/json' },
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: opts.method ?? 'GET',
+      headers: opts.body !== undefined ? { 'content-type': 'application/json', accept: 'application/json' } : { accept: 'application/json' },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000),
+    });
+  } catch (err) {
+    const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+    throw new Error(`could not reach ${new URL(url).origin}: ${cause?.code ?? cause?.message ?? (err as Error).message}`);
+  }
   if (!res.ok) throw new HttpError(res.status, url, await res.text().catch(() => ''));
   return res;
 }

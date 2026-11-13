@@ -16,8 +16,8 @@ export interface ChatMessage {
   suggestions: Suggestion[];
   status: 'streaming' | 'done' | 'error' | 'interrupted';
   error?: string;
-  /** For voice turns: when the turn started, to attach suggestions that arrive by state. */
-  startedAt?: number;
+  /** For voice turns: suggestion ids that existed when the turn started (new voice suggestions after it belong to this turn). */
+  baseline?: string[];
 }
 
 export interface UiStore {
@@ -121,10 +121,9 @@ export const useUi = create<UiStore>()((set, get) => ({
       // from voice that appeared since the turn started to that turn's reply.
       let chat = st.chat;
       const voiceTurn = [...chat].reverse().find((m) => m.role === 'assistant' && m.via === 'voice');
-      if (voiceTurn?.startedAt) {
-        const fresh = s.suggestions.filter(
-          (x) => x.source?.connector === 'voice' && Date.parse(x.createdAt) >= voiceTurn.startedAt! - 2000 && !voiceTurn.suggestions.some((y) => y.id === x.id),
-        );
+      if (voiceTurn?.baseline) {
+        const base = new Set(voiceTurn.baseline);
+        const fresh = s.suggestions.filter((x) => x.source?.connector === 'voice' && !base.has(x.id) && !voiceTurn.suggestions.some((y) => y.id === x.id));
         if (fresh.length) chat = chat.map((m) => (m === voiceTurn ? { ...m, suggestions: [...m.suggestions, ...fresh] } : m));
       }
       return { state: s, liveNudges: st.liveNudges.filter((n) => !known.has(n.id)), chat };
@@ -218,12 +217,11 @@ export const useUi = create<UiStore>()((set, get) => ({
     set((st) => ({ voice: { ...st.voice, ...v } }));
   },
   voiceUserTurn(text) {
-    const now = Date.now();
     set((st) => ({
       chat: [
         ...st.chat,
         { id: newId('u'), role: 'user', text, via: 'voice', suggestions: [], status: 'done' },
-        { id: newId('a'), role: 'assistant', text: '', via: 'voice', suggestions: [], status: 'streaming', startedAt: now },
+        { id: newId('a'), role: 'assistant', text: '', via: 'voice', suggestions: [], status: 'streaming', baseline: [...(st.state?.suggestions.map((x) => x.id) ?? []), ...Object.keys(st.decided)] },
       ],
       voice: { ...st.voice, partial: '', status: 'thinking' },
     }));

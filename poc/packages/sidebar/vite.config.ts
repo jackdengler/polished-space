@@ -8,5 +8,11 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   base: '/',
-  build: { outDir: 'dist', emptyOutDir: true, sourcemap: false },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    sourcemap: false,
+    // AudioWorklet modules ship as real files (not data: URLs), so a strict CSP can allow them.
+    assetsInlineLimit: (file) => (file.includes('.worklet.') ? false : undefined),
+  },
 });
