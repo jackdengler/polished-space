@@ -8,6 +8,7 @@ const task = (title: string, who: string[], due: string): Task => ({ id: `t${++n
 const client = (team: string[], tasks: Task[]): Client => ({
   id: 'c', createdAt: t0, updatedAt: t0, name: 'Acme', logo: null, teamMemberIds: team, plannedThrough: null, archived: false,
   adhoc: { deliverables: [{ id: 'd', createdAt: t0, updatedAt: t0, title: 'General', tasks }] }, meetings: [],
+  emailDomains: [], contacts: [], fileFolder: null, nicknames: [],
 });
 
 describe('month calendar', () => {

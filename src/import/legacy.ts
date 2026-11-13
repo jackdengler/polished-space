@@ -158,6 +158,7 @@ export function convertLegacyClients(
       teamMemberIds,
       plannedThrough,
       archived: src.archived === true,
+      emailDomains: [], contacts: [], fileFolder: null, nicknames: [],
       adhoc: { deliverables: adhoc.length ? adhoc : [{ ...rec(), title: 'General', tasks: [] }] },
       meetings,
     };

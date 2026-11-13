@@ -8,6 +8,7 @@ import { confirmDialog, ConfirmHost } from './Modal';
 import { readSeed } from '../seed';
 import { embedded } from '../lib/env';
 import { attach, flush } from '../storage/persistence';
+import { ServerAdapter } from '../storage/serverAdapter';
 import { Icon } from './Icon';
 import { BrandMark } from './BrandMark';
 
@@ -16,6 +17,8 @@ const BROWSER_KEY = 'compensian-pm-demo';
 const seed = readSeed();
 /** `?storage=opfs` uses the browser's private file system instead of a picked folder (for automated tests). */
 const testStorage = new URLSearchParams(location.search).get('storage') === 'opfs';
+/** `?storage=server` opens the workspace served by the same origin (the POC sandbox's test copy). */
+const serverStorage = new URLSearchParams(location.search).get('storage') === 'server';
 
 export function Welcome() {
   const [saved, setSaved] = useState<FileSystemDirectoryHandle | null>(null);
@@ -36,7 +39,17 @@ export function Welcome() {
   }
 
   useEffect(() => {
-    if (testStorage) return;
+    if (!serverStorage) return;
+    const adapter = new ServerAdapter();
+    setBusy(true);
+    adapter.load()
+      .then((ws) => { if (ws) attach(adapter, ws); else setError('The server has no workspace.'); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  }, []);
+
+  useEffect(() => {
+    if (testStorage || serverStorage) return;
     void getSavedFolder().then(async (h) => {
       if (!h) return;
       setSaved(h);

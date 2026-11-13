@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "node -e \"console.log('@poc/pm-server: placeholder, not built yet'); setInterval(() => {}, 1 << 30)\"",
-    "typecheck": "tsc -p tsconfig.json"
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "e2e": "node e2e/live.mjs"
   },
   "dependencies": {
-    "@poc/contracts": "*"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@poc/contracts": "*",
+    "zod": "^4.6.7"
   }
 }

@@ -26,7 +26,7 @@ const task = (title: string, assignee: string | string[] | null, dueDate: string
 const client = (name: string, team: string[], tasks: Task[], extra: Partial<Client> = {}): Client => ({
   id: `c-${name}`, createdAt: t0, updatedAt: t0, name, logo: null, teamMemberIds: team, plannedThrough: null, archived: false,
   adhoc: { deliverables: [{ id: `d-${name}`, createdAt: t0, updatedAt: t0, title: 'General', tasks }] },
-  meetings: [], ...extra,
+  meetings: [], emailDomains: [], contacts: [], fileFolder: null, nicknames: [], ...extra,
 });
 
 const ME = 'me', PAT = 'pat';

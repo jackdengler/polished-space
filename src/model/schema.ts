@@ -64,6 +64,12 @@ export const ClientSchema = z.object({
   /** Work not tied to a meeting. Same shape as a meeting, minus the date. */
   adhoc: z.object({ deliverables: z.array(DeliverableSchema) }),
   meetings: z.array(MeetingSchema),
+  /** Client-matching details for the AI assistant POC. No editing screen yet; empty by default. */
+  emailDomains: z.array(z.string()).default([]),
+  contacts: z.array(z.object({ name: z.string(), email: z.string(), role: z.string().default('') })).default([]),
+  /** Folder name on the file server. */
+  fileFolder: z.string().nullable().default(null),
+  nicknames: z.array(z.string()).default([]),
 });
 
 export const ROLES = ['Principal', 'Sr Consultant', 'Consultant', 'Sr Associate', 'Associate', 'Unassigned'] as const;

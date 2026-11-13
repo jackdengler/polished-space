@@ -32,7 +32,7 @@ function useGlobalKeys() {
     document.addEventListener('visibilitychange', onHide);
     const onUnload = (e: BeforeUnloadEvent) => {
       flushTime();
-      if (usePersistence.getState().adapter?.kind === 'folder' && hasUnsavedChanges()) { void flush(); e.preventDefault(); }
+      if (usePersistence.getState().adapter?.kind !== 'memory' && hasUnsavedChanges()) { void flush(); e.preventDefault(); }
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('beforeunload', onUnload);

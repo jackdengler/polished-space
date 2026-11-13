@@ -112,6 +112,7 @@ export function makeDemoWorkspace(today: string = todayIso()): Workspace {
       ...rec('client'), name, logo: null, teamMemberIds: members, plannedThrough: planned, archived,
       adhoc: { deliverables: [{ ...rec('deliv'), title: 'General', tasks: adhoc }] },
       meetings,
+      emailDomains: [], contacts: [], fileFolder: null, nicknames: [],
     };
   }
 

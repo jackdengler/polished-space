@@ -17,6 +17,8 @@ export const usePersistence = create<PersistenceState>(() => ({ adapter: null, s
 const SAVE_DELAY_MS = 600;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let unsubscribe: (() => void) | undefined;
+let unwatch: (() => void) | undefined;
+let watched: StorageAdapter | null = null;
 let saving: Promise<void> = Promise.resolve();
 
 /** Start autosaving the store to `adapter`, beginning from `ws`. */
@@ -28,6 +30,16 @@ export function attach(adapter: StorageAdapter, ws: Workspace) {
   unsubscribe = useStore.subscribe((s, prev) => {
     if (s.ws !== prev.ws) schedule();
   });
+  // Adapters that can see outside changes (the server): reload when nothing here is unsaved;
+  // otherwise the next save hits the conflict banner as usual.
+  if (watched !== adapter) {
+    unwatch?.();
+    watched = adapter;
+    unwatch = adapter.watch?.(() => {
+      const p = usePersistence.getState();
+      if (p.adapter === adapter && p.status === 'saved') void reloadFromDisk();
+    });
+  }
 }
 
 function schedule() {
@@ -73,6 +85,9 @@ export async function closeWorkspace() {
   if (usePersistence.getState().status !== 'conflict') await flush();
   unsubscribe?.();
   unsubscribe = undefined;
+  unwatch?.();
+  unwatch = undefined;
+  watched = null;
   usePersistence.setState({ adapter: null, status: 'saved', error: null });
   navigate({}, { replace: true });
 }

@@ -140,7 +140,7 @@ function WorkspaceMenu() {
           </div>
           <div className="menu-sep" />
           <button role="menuitem" className="menu-item" onClick={() => run(() => void closeWorkspace())}>
-            <Icon name="folder" size={14} /> {adapter?.kind === 'memory' ? 'Back to start' : 'Switch folder'}
+            <Icon name="folder" size={14} /> {adapter?.kind === 'folder' ? 'Switch folder' : 'Back to start'}
           </button>
         </div>
       </Popover>

@@ -220,6 +220,7 @@ export const useStore = create<Store>()((set, get) => {
       const client: Client = {
         ...stamp(), name: name.trim(), logo: null, teamMemberIds: [], plannedThrough: null,
         archived: false, adhoc: { deliverables: [emptyDeliverable('General')] }, meetings: [],
+        emailDomains: [], contacts: [], fileFolder: null, nicknames: [],
       };
       mutate((ws) => { ws.clients.push(client); });
       return client.id;
