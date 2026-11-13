@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandbox Sources</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #657085; --line: #e3e6eb;
+    --accent: #2f5bd3; --accent-soft: #e8eefc; --new: #0f7b4f; --new-soft: #e3f5ec;
+    --warn: #a4471b; --chat: #6a3fc4; --chat-soft: #efe9fb; --shadow: 0 1px 2px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1a1e26; --text: #e5e8ee; --muted: #9aa3b4; --line: #2a303b;
+      --accent: #7d9cf0; --accent-soft: #232c42; --new: #5fd09d; --new-soft: #17322a;
+      --warn: #f0a07a; --chat: #b49af0; --chat-soft: #2a2340; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .clock { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--new); margin-right: 6px; vertical-align: 1px; }
+  .live.off { background: var(--warn); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; padding: 20px; max-width: 1280px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .tabs { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tab { border: 0; background: none; color: var(--muted); font: inherit; font-weight: 550; padding: 10px 14px;
+    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .count { font-size: 12px; color: var(--muted); margin-left: 4px; }
+  .tab .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--new); margin-left: 6px; vertical-align: 1px; }
+  .tab.has-new .dot { display: inline-block; }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .empty { padding: 32px 20px; color: var(--muted); text-align: center; }
+  .item { padding: 12px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:last-child { border-bottom: 0; }
+  .item:hover { background: color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+  .item.new { background: var(--new-soft); }
+  .row { display: flex; gap: 12px; align-items: baseline; }
+  .who { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .when { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .subject { margin-top: 2px; }
+  .preview { color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .body { display: none; margin-top: 10px; white-space: pre-wrap; padding: 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); }
+  .item.open .body { display: block; }
+  .item.open .preview { display: none; }
+  .pill { font-size: 11px; font-weight: 650; letter-spacing: .02em; padding: 1px 7px; border-radius: 999px; }
+  .pill.new { background: var(--new); color: var(--panel); }
+  .pill.chan { background: var(--chat-soft); color: var(--chat); }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .day { padding: 10px 18px 6px; font-size: 12px; font-weight: 650; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .04em; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .day.today { color: var(--accent); }
+  .event { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; cursor: default; }
+  .event .time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .side section { padding: 14px 16px; }
+  .side h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .canned { display: flex; flex-direction: column; gap: 6px; }
+  .canned button { text-align: left; display: flex; gap: 8px; align-items: baseline; }
+  .canned .kind { font-size: 11px; font-weight: 650; color: var(--accent); min-width: 42px; }
+  .canned .kind.chat { color: var(--chat); }
+  .canned .step { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+    padding: 7px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--warn); }
+  form { display: grid; gap: 8px; }
+  label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+  input, textarea, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 9px; width: 100%; }
+  textarea { min-height: 76px; resize: vertical; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 2px 0; }
+  details[open] summary { margin-bottom: 10px; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--panel);
+    padding: 9px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+  .toast.show { opacity: 1; }
+  .toast.err { background: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sandbox sources</h1>
+  <span class="badge">Fake Outlook and Zoom: nothing leaves this machine</span>
+  <span class="clock"><span class="live" id="live"></span><span id="clock">connecting...</span></span>
+</header>
+<main>
+  <div class="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="inbox">Inbox<span class="count" id="n-inbox"></span><span class="dot"></span></button>
+      <button class="tab" role="tab" data-tab="sent">Sent<span class="count" id="n-sent"></span><span class="dot"></span></button>
+      <button class="tab" role="tab" data-tab="calendar">Calendar<span class="count" id="n-calendar"></span><span class="dot"></span></button>
+      <button class="tab" role="tab" data-tab="chat">Chat<span class="count" id="n-chat"></span><span class="dot"></span></button>
+    </div>
+    <ul class="list" id="list" aria-live="polite"></ul>
+  </div>
+
+  <div class="side">
+    <section class="panel">
+      <h2>Demo messages</h2>
+      <div class="canned" id="canned"></div>
+    </section>
+    <section class="panel">
+      <details id="mail-details">
+        <summary>Drop an email</summary>
+        <form id="mail-form">
+          <div class="pair">
+            <label>From name<input name="name" required placeholder="Michael Okafor"></label>
+            <label>From address<input name="address" type="email" required placeholder="name@company.example"></label>
+          </div>
+          <label>Subject<input name="subject" required></label>
+          <label>Body<textarea name="body" required></textarea></label>
+          <button class="primary" type="submit">Drop into inbox</button>
+        </form>
+      </details>
+    </section>
+    <section class="panel">
+      <details id="chat-details">
+        <summary>Drop a chat message</summary>
+        <form id="chat-form">
+          <div class="pair">
+            <label>Sender name<input name="name" required placeholder="Priya Shah"></label>
+            <label>Sender address<input name="address" type="email" required placeholder="name@company.example"></label>
+          </div>
+          <label>Where<select name="where" id="chat-where"><option value="">Personal chat with the sender</option></select></label>
+          <label>Message<textarea name="message" required></textarea></label>
+          <button class="primary" type="submit">Drop into chat</button>
+        </form>
+      </details>
+    </section>
+    <section class="panel">
+      <h2>Reset</h2>
+      <button class="danger" id="reset" type="button">Reset mail, calendar and chat to the seed</button>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const PATHS = {
+  inbox: '/v1.0/me/messages?$orderby=receivedDateTime%20desc',
+  sent: '/_control/sent',
+  chat: '/v2/chat/users/me/messages',
+  canned: '/_control/canned',
+  health: '/_control/health',
+  mail: '/_control/mail',
+  dropChat: '/_control/chat',
+  reset: '/_control/reset',
+};
+const POLL_MS = 1500;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const state = { tab: 'inbox', tz: 'UTC', now: new Date(), data: { inbox: [], sent: [], calendar: [], chat: [] },
+  seen: null, fresh: new Set(), open: new Set(), lastJson: '' };
+try { const t = localStorage.getItem('mocks-tab'); if (t) state.tab = t; } catch {}
+
+async function api(path, init) {
+  const res = await fetch(path, { cache: 'no-store', ...init, headers: { 'content-type': 'application/json', ...(init && init.headers) } });
+  const text = await res.text();
+  const body = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error((body && body.error) || res.statusText);
+  return body;
+}
+
+// ---- time formatting in the sandbox's working zone ----
+const fmt = (opts) => new Intl.DateTimeFormat('en-GB', { timeZone: state.tz, ...opts });
+const dayKey = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: state.tz }).format(d);
+const hm = (d) => fmt({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+function dayLabel(d) {
+  const k = dayKey(d), today = dayKey(state.now), tomorrow = dayKey(new Date(state.now.getTime() + 864e5));
+  const yesterday = dayKey(new Date(state.now.getTime() - 864e5));
+  const long = fmt({ weekday: 'long', day: 'numeric', month: 'short' }).format(d);
+  if (k === today) return 'Today, ' + long;
+  if (k === tomorrow) return 'Tomorrow, ' + long;
+  if (k === yesterday) return 'Yesterday, ' + long;
+  return long;
+}
+function when(iso) {
+  const d = new Date(iso);
+  return dayKey(d) === dayKey(state.now) ? hm(d) : fmt({ day: 'numeric', month: 'short' }).format(d) + ', ' + hm(d);
+}
+const graphTime = (g) => new Date(g.dateTime.slice(0, 23) + 'Z'); // the mock always uses timeZone UTC
+
+// ---- rendering ----
+function itemClass(id) { return 'item' + (state.fresh.has(id) ? ' new' : '') + (state.open.has(id) ? ' open' : ''); }
+const newPill = (id) => state.fresh.has(id) ? ' <span class="pill new">NEW</span>' : '';
+const names = (rs) => rs.map((r) => r.emailAddress.name || r.emailAddress.address).join(', ');
+
+function renderMail(list, outgoing) {
+  if (!list.length) return '<li class="empty">' + (outgoing ? 'Nothing sent yet. Approved replies land here.' : 'The inbox is empty.') + '</li>';
+  return list.map((m) => '<li class="' + itemClass(m.id) + '" data-id="' + esc(m.id) + '">' +
+    '<div class="row"><span class="who">' + esc(outgoing ? 'To: ' + names(m.toRecipients) : m.from.emailAddress.name) + '</span>' +
+    newPill(m.id) + '<span class="when">' + esc(when(m.receivedDateTime)) + '</span></div>' +
+    '<div class="subject">' + esc(m.subject) + '</div>' +
+    (outgoing ? '' : '<div class="meta">' + esc(m.from.emailAddress.address) + '</div>') +
+    '<div class="preview">' + esc(m.bodyPreview) + '</div>' +
+    '<div class="body">' + esc(m.body.content) + '</div></li>').join('');
+}
+
+function renderCalendar(list) {
+  if (!list.length) return '<li class="empty">No events in range.</li>';
+  let html = '', last = '';
+  for (const e of list) {
+    const s = graphTime(e.start), en = graphTime(e.end), k = dayKey(s);
+    if (k !== last) { html += '<li class="day' + (k === dayKey(state.now) ? ' today' : '') + '">' + esc(dayLabel(s)) + '</li>'; last = k; }
+    const others = e.attendees.length > 1 ? e.attendees.length + ' attendees' : 'Just you';
+    html += '<li class="' + itemClass(e.id) + ' event" data-id="' + esc(e.id) + '"><span class="time">' + esc(hm(s) + ' to ' + hm(en)) + '</span>' +
+      '<span><span class="who">' + esc(e.subject) + '</span>' + newPill(e.id) +
+      '<div class="meta">' + esc(others + (e.showAs !== 'busy' ? ' · ' + e.showAs : '') + (e.categories.length ? ' · ' + e.categories.join(', ') : '')) + '</div></span></li>';
+  }
+  return html;
+}
+
+function renderChat(list) {
+  if (!list.length) return '<li class="empty">No chat messages.</li>';
+  return list.map((m) => {
+    const where = m.to_channel ? '#' + (m.channel_name || m.to_channel) : 'Personal chat';
+    return '<li class="' + itemClass(m.id) + '" data-id="' + esc(m.id) + '">' +
+      '<div class="row"><span class="who">' + esc(m.sender_display_name) + '</span><span class="pill chan">' + esc(where) + '</span>' +
+      newPill(m.id) + '<span class="when">' + esc(when(m.date_time)) + '</span></div>' +
+      '<div class="subject">' + esc(m.message) + '</div></li>';
+  }).join('');
+}
+
+function render() {
+  const d = state.data;
+  for (const t of ['inbox', 'sent', 'calendar', 'chat']) {
+    $('#n-' + t).textContent = d[t].length;
+    const tabEl = document.querySelector('[data-tab="' + t + '"]');
+    tabEl.setAttribute('aria-selected', String(state.tab === t));
+    tabEl.classList.toggle('has-new', d[t].some((x) => state.fresh.has(x.id)));
+  }
+  $('#list').innerHTML = state.tab === 'inbox' ? renderMail(d.inbox, false)
+    : state.tab === 'sent' ? renderMail(d.sent, true)
+    : state.tab === 'calendar' ? renderCalendar(d.calendar)
+    : renderChat(d.chat);
+}
+
+// ---- polling ----
+async function refresh() {
+  try {
+    const health = await api(PATHS.health);
+    state.tz = health.tz || 'UTC';
+    state.now = new Date(health.now);
+    const from = new Date(state.now.getTime() - 14 * 864e5).toISOString();
+    const to = new Date(state.now.getTime() + 42 * 864e5).toISOString();
+    const [inbox, sent, cal, chat] = await Promise.all([
+      api(PATHS.inbox),
+      api(PATHS.sent),
+      api('/v1.0/me/calendarView?startDateTime=' + encodeURIComponent(from) + '&endDateTime=' + encodeURIComponent(to)),
+      api(PATHS.chat),
+    ]);
+    const data = {
+      inbox: inbox.value,
+      sent: [...sent].sort((a, b) => b.receivedDateTime.localeCompare(a.receivedDateTime)),
+      calendar: cal.value,
+      chat: [...chat.messages].reverse(),
+    };
+    const ids = Object.values(data).flat().map((x) => x.id);
+    if (state.seen === null) state.seen = new Set(ids);
+    for (const id of ids) if (!state.seen.has(id)) state.fresh.add(id);
+    updateChannels(data.chat);
+    $('#live').classList.remove('off');
+    $('#clock').textContent = 'Live · ' + fmt({ weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(state.now) + ' ' + state.tz;
+    const json = JSON.stringify(data) + state.tz;
+    if (json !== state.lastJson) { state.lastJson = json; state.data = data; render(); }
+  } catch (err) {
+    $('#live').classList.add('off');
+    $('#clock').textContent = 'Not connected: ' + err.message;
+  }
+}
+
+function updateChannels(chat) {
+  const sel = $('#chat-where');
+  const known = new Map();
+  for (const m of chat) if (m.to_channel) known.set(m.to_channel, m.channel_name || m.to_channel);
+  for (const [id, name] of known) {
+    if (![...sel.options].some((o) => o.value === id)) sel.add(new Option('#' + name, id));
+  }
+}
+
+function toast(msg, isErr) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+function showTab(tab) {
+  state.tab = tab;
+  try { localStorage.setItem('mocks-tab', tab); } catch {}
+  render();
+}
+
+async function drop(path, body, tab, label) {
+  try {
+    await api(path, { method: 'POST', body: JSON.stringify(body) });
+    toast('Dropped: ' + label);
+    showTab(tab);
+    await refresh();
+  } catch (err) { toast('Failed: ' + err.message, true); }
+}
+
+// ---- wiring ----
+document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+$('#list').addEventListener('click', (e) => {
+  const li = e.target.closest('.item');
+  if (!li || li.classList.contains('event') || window.getSelection().toString()) return;
+  const id = li.dataset.id;
+  state.open.has(id) ? state.open.delete(id) : state.open.add(id);
+  li.classList.toggle('open');
+});
+
+$('#mail-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  drop(PATHS.mail, { from: { name: f.get('name'), address: f.get('address') }, subject: f.get('subject'), body: f.get('body') }, 'inbox', f.get('subject'))
+    .then(() => { e.target.subject.value = ''; e.target.body.value = ''; });
+});
+$('#chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const where = f.get('where');
+  const opt = $('#chat-where').selectedOptions[0];
+  const body = { sender: f.get('address'), sender_display_name: f.get('name'), message: f.get('message') };
+  if (where) { body.to_channel = where; body.channel_name = opt.textContent.replace(/^#/, ''); }
+  drop(PATHS.dropChat, body, 'chat', 'chat from ' + f.get('name')).then(() => { e.target.message.value = ''; });
+});
+$('#reset').addEventListener('click', async () => {
+  if (!confirm('Reset the inbox, sent items, calendar and chat to the seeded state?')) return;
+  try {
+    await api(PATHS.reset, { method: 'POST' });
+    state.seen = null; state.fresh.clear(); state.open.clear();
+    toast('Reset to the seed');
+    await refresh();
+  } catch (err) { toast('Reset failed: ' + err.message, true); }
+});
+
+async function loadCanned() {
+  try {
+    const canned = await api(PATHS.canned);
+    $('#canned').innerHTML = canned.map((c, i) =>
+      '<button type="button" data-i="' + i + '"><span class="kind' + (c.chat ? ' chat' : '') + '">' + (c.mail ? 'EMAIL' : 'CHAT') + '</span>' +
+      '<span>' + esc(c.description) + '</span><span class="step">' + (c.step ? 'Step ' + c.step : 'Extra') + '</span></button>').join('') ||
+      '<div class="empty">No canned messages in the seed.</div>';
+    $('#canned').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      const c = canned[Number(b.dataset.i)];
+      if (c.mail) drop(PATHS.mail, c.mail, 'inbox', c.description);
+      else drop(PATHS.dropChat, c.chat, 'chat', c.description);
+    }));
+  } catch (err) { $('#canned').textContent = 'Could not load canned messages: ' + err.message; }
+}
+
+render();
+loadCanned();
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>
