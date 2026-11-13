@@ -34,12 +34,12 @@ export class GraphMailConnector implements MailConnector {
 
   /**
    * Graph `sendMail` answers 202 with no body, so there is no message id to
-   * return. The mock may name the Sent item in a `location` or `x-message-id`
+   * return. The mock names the Sent item in the `x-poc-message-id`
    * header; otherwise a local id is returned (only used for logs).
    */
   async send(draft: MailDraft): Promise<{ id: string }> {
     const res = await http(joinUrl(this.baseUrl, PATHS.graph.sendMail), { method: 'POST', body: draftToSendMail(draft) });
-    const header = res.headers.get('x-message-id') ?? res.headers.get('location')?.split('/').pop() ?? null;
+    const header = res.headers.get('x-poc-message-id') ?? null;
     return { id: header || `sent-${randomUUID()}` };
   }
 }

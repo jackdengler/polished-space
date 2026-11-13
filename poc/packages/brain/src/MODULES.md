@@ -93,5 +93,5 @@ approval.
 - `POST /api/chat` → SSE stream of `CHAT_SSE_EVENTS` (`delta`, `suggestion`, `done`, `error`), using `ctx.claude.stream({ call: 'chat', sourceId: null }, …)` (`on('text')`, `abort()`, `finalMessage()`).
 - Tools: `list_tasks`, `list_clients` (run at once via `ctx.read.pm`) and `propose_*` tools that only call `ctx.suggestions.add`. Set `eager_input_streaming: true` on streamed tools and validate each tool input with zod before use. Never forced `tool_choice` (the wrapper rejects it).
 - History is append-only in `DATA_LAYOUT.brainConversation`.
-- `WS /api/voice` via `ctx.upgrades.add`; speech service clients (`SpeechToText`/`TextToSpeech` from `@poc/contracts`) live in this folder, using `ctx.config.speechUrl`. Barge-in aborts the Claude stream and the TTS job.
+- `WS /api/voice` via `ctx.upgrades.add`; speech clients: use `HttpSpeechToText` / `HttpTextToSpeech` from `@poc/speech/client` (they implement the contract interfaces; add `"@poc/speech": "*"` only if the lead agrees, since `package.json` is shared), pointed at `ctx.config.speechUrl`. Barge-in aborts the Claude stream and the TTS job.
 - If Haiku cannot hold the conversation, changing the chat model is a one-line change in `models.ts`: ask the lead.
