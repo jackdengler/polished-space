@@ -1,15 +1,17 @@
-# Used by BuildKit for Dockerfile.node (context = repo root).
+# Used by BuildKit for Dockerfile.speech (context = repo root).
+# Allow-list: the speech image needs only the POC manifests, contracts and speech.
+*
+!poc/package.json
+!poc/package-lock.json
+!poc/tsconfig.base.json
+!poc/packages/*/package.json
+!poc/seed/package.json
+!poc/packages/contracts
+!poc/packages/speech
+# Never send downloaded models or installed modules into the build.
+poc/packages/speech/models
 **/node_modules
-**/dist
-.git
-poc/data
-poc/.env
-poc/test-results
 **/.env
 **/.env.*
 **/*.pem
 **/*.key
-workspace.json
-backups
-test-results
-artifact

@@ -45,14 +45,12 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const parts: Buffer[] = [];
     let size = 0;
+    // Over the limit: keep draining (so the 413 reaches the client) but drop the data.
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > limit) {
-        reject(new Error('body too large'));
-        req.destroy();
-      } else parts.push(c);
+      if (size <= limit) parts.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(parts).toString('utf8')));
+    req.on('end', () => (size > limit ? reject(new Error('body too large')) : resolve(Buffer.concat(parts).toString('utf8'))));
     req.on('error', reject);
   });
 }

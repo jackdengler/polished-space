@@ -4,9 +4,10 @@ import { float32ToPcm16 } from './pcm';
 /**
  * Splits text into pieces to synthesise one at a time: sentences, and long
  * sentences at commas or other clause breaks, so the first audio is ready
- * soon and an abort takes effect at the next piece.
+ * soon and an abort takes effect at the next piece. A first sentence longer
+ * than `firstMaxChars` is also split at its first comma or colon.
  */
-export function splitForSpeech(text: string, maxChars = 140): string[] {
+export function splitForSpeech(text: string, maxChars = 140, firstMaxChars = 60): string[] {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (!clean) return [];
   const sentences = clean.match(/[^.!?;]+(?:[.!?;]+["')\]]*|$)/g) ?? [clean];
@@ -28,7 +29,14 @@ export function splitForSpeech(text: string, maxChars = 140): string[] {
     }
     if (cur) out.push(...hardWrap(cur, maxChars));
   }
-  return out.filter((p) => /[\p{L}\p{N}]/u.test(p));
+  const pieces = out.filter((p) => /[\p{L}\p{N}]/u.test(p));
+  // Faster first audio: speak a long first sentence's opening clause on its own.
+  const first = pieces[0];
+  if (first && first.length > firstMaxChars) {
+    const m = /^(.{15,}?[,:])\s+(.{15,})$/su.exec(first);
+    if (m) pieces.splice(0, 1, m[1]!, m[2]!);
+  }
+  return pieces;
 }
 
 function hardWrap(s: string, max: number): string[] {
