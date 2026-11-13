@@ -215,13 +215,14 @@ export class ChatPipeline {
             round.complete = true;
             break;
           }
-          // Run all tool calls of this round; their results go back in one user message.
-          round.toolResults = await Promise.all(
-            uses.map(async (u): Promise<Anthropic.ToolResultBlockParam> => {
-              const out = await runTool(u.name, u.input, toolEnv);
-              return { type: 'tool_result', tool_use_id: u.id, content: out.content, ...(out.isError ? { is_error: true } : {}) };
-            }),
-          );
+          // Run this round's tool calls in order (so duplicate checks see earlier
+          // proposals); all results go back in one user message.
+          const results: Anthropic.ToolResultBlockParam[] = [];
+          for (const u of uses) {
+            const out = await runTool(u.name, u.input, toolEnv);
+            results.push({ type: 'tool_result', tool_use_id: u.id, content: out.content, ...(out.isError ? { is_error: true } : {}) });
+          }
+          round.toolResults = results;
           round.complete = true;
           if (r === this.maxRounds - 1) error = 'I took too many steps on that one. Could you ask again more simply?';
         } catch (e) {

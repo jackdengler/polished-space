@@ -7,6 +7,8 @@
  *                             speech service's STT_MIN_SPEECH_MS already applies)
  *   POC_VOICE_PLAYBACK_MARGIN_MS  how long after the estimated end of playback
  *                             the assistant still counts as speaking (default 300)
+ *   POC_STT_ENDPOINT_MS       the speech service's STT_ENDPOINT_MS (default 400), used
+ *                             only to estimate end of speech in the timings log
  *   POC_CHAT_THINKING         'disabled' (default, fastest first token) or 'adaptive'
  */
 import { ChatBody, PATHS, type SpeechToText, type Suggestion, type TextToSpeech } from '@poc/contracts';
@@ -26,6 +28,7 @@ export interface ChatModuleOptions extends PipelineOptions {
   speechUrl?: string;
   bargeInMs?: number;
   playbackMarginMs?: number;
+  sttEndpointMs?: number;
   chunker?: ChunkerOptions;
 }
 
@@ -74,6 +77,7 @@ export function createChatModule(opts: ChatModuleOptions = {}): ChatModule {
         tts,
         bargeInMs: opts.bargeInMs ?? envNum('POC_VOICE_BARGE_IN_MS', 0),
         playbackMarginMs: opts.playbackMarginMs ?? envNum('POC_VOICE_PLAYBACK_MARGIN_MS', 300),
+        sttEndpointMs: opts.sttEndpointMs ?? envNum('POC_STT_ENDPOINT_MS', 400),
         chunker: opts.chunker,
         log: (m: string) => ctx.log(`voice: ${m}`),
       };
@@ -113,8 +117,8 @@ export function createChatModule(opts: ChatModuleOptions = {}): ChatModule {
         });
       });
     },
-    stop() {
-      for (const s of sessions) s.close();
+    async stop() {
+      await Promise.all([...sessions].map((s) => s.close()));
       sessions.clear();
       if (wss) {
         for (const c of wss.clients) c.terminate();

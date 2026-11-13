@@ -40,6 +40,8 @@ export interface VoiceOptions {
   bargeInMs: number;
   /** Playback is treated as still going this long after the last audio should have ended. */
   playbackMarginMs: number;
+  /** The speech service's end-of-utterance silence (its STT_ENDPOINT_MS), for the timings log. */
+  sttEndpointMs: number;
   chunker?: ChunkerOptions;
   log: (msg: string) => void;
 }
@@ -48,9 +50,16 @@ export interface VoiceTimings {
   ts: string;
   turnId: string | null;
   transcript: string;
-  /** Epoch ms. lastPartialAt is the closest the brain sees to "end of speech". */
+  /** Epoch ms. */
   speechStartAt: number | null;
   lastPartialAt: number | null;
+  /**
+   * Estimated end of speech. The brain never sees it directly: the speech
+   * service sends `final` after `sttEndpointMs` of silence, so it is
+   * finalAt - sttEndpointMs (the last partial often arrives only just before
+   * the final, so it is a poor marker).
+   */
+  speechEndAt: number;
   finalAt: number;
   firstTokenAt: number | null;
   firstPieceAt: number | null;
@@ -288,6 +297,7 @@ export class VoiceSession {
   private utterance: { startAt: number; lastPartial: string; lastPartialAt: number | null; bargeTimer: NodeJS.Timeout | null } | null = null;
   private ttsClient: TextToSpeech | null = null;
   private closed = false;
+  private inflight = new Set<Promise<void>>();
 
   constructor(
     private ws: WebSocket,
@@ -296,7 +306,7 @@ export class VoiceSession {
     private opts: VoiceOptions,
   ) {
     ws.on('message', (data, isBinary) => this.onMessage(data, isBinary));
-    ws.on('close', () => this.close());
+    ws.on('close', () => void this.close());
     ws.on('error', (e) => opts.log(`voice socket error: ${e.message}`));
   }
 
@@ -410,14 +420,20 @@ export class VoiceSession {
     const u = this.utterance;
     this.utterance = null;
     if (u?.bargeTimer) clearTimeout(u.bargeTimer);
-    if (!text) return; // the speech service may end an utterance with nothing recognised
+    if (!text) {
+      // The speech service may end an utterance with nothing recognised: no turn; clear a stale partial.
+      if (u?.lastPartial) this.send({ type: 'stt.partial', text: '' });
+      return;
+    }
     if (this.isActive() && isEcho(text, this.turn?.fullText ?? '')) {
       this.opts.log(`ignored a final that echoes the reply: "${text}"`);
       return;
     }
     this.send({ type: 'stt.final', text });
     if (this.isActive()) this.interrupt('final');
-    void this.startTurn(text, u, Date.now());
+    const p = this.startTurn(text, u, Date.now());
+    this.inflight.add(p);
+    void p.finally(() => this.inflight.delete(p));
   }
 
   /** Barge-in. Sends `interrupted`, mutes audio, aborts Claude and TTS. */
@@ -439,6 +455,7 @@ export class VoiceSession {
       transcript: text,
       speechStartAt: u?.startAt ?? null,
       lastPartialAt: u?.lastPartialAt ?? null,
+      speechEndAt: finalAt - this.opts.sttEndpointMs,
       finalAt,
       firstTokenAt: null,
       firstPieceAt: null,
@@ -487,7 +504,7 @@ export class VoiceSession {
       if (this.turn === t) this.turn = null;
       timings.doneAt = Date.now();
       timings.pieces = t.pieces.length;
-      const end = timings.lastPartialAt;
+      const end = timings.speechEndAt;
       timings.ms = {
         speechEndToFinal: diff(end, timings.finalAt),
         finalToFirstToken: diff(timings.finalAt, timings.firstTokenAt),
@@ -499,8 +516,13 @@ export class VoiceSession {
     }
   }
 
-  close(): void {
-    if (this.closed) return;
+  /** Stop listening and any reply; resolves once in-flight turns are stored and logged. */
+  async close(): Promise<void> {
+    if (!this.closed) this.abortAll();
+    await Promise.allSettled([...this.inflight]);
+  }
+
+  private abortAll(): void {
     this.closed = true;
     this.closeStt();
     const t = this.turn;
