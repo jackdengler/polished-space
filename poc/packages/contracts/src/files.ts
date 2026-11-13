@@ -35,3 +35,22 @@ export function mimeTypeFor(name: string): FileMimeType | null {
   const dot = name.lastIndexOf('.');
   return dot < 0 ? null : BY_EXT[name.slice(dot).toLowerCase()] ?? null;
 }
+
+/**
+ * `GET /api/files?path=` (brain, read only): one client file to show next to
+ * a file review. Text files come back as they are. PDFs come back as the
+ * text extracted from their content streams (`textSource: 'pdf_text'`;
+ * layout is not kept), plus `rawUrl` to open the PDF itself inline.
+ * Paths outside the fake file server's root are refused (400).
+ */
+export const FileView = FileInfo.extend({
+  text: z.string(),
+  textSource: z.enum(['file', 'pdf_text']),
+  /** True when `text` was cut at FILE_VIEW_MAX_CHARS. */
+  truncated: z.boolean(),
+  /** Same-origin URL that serves the file itself (PDFs inline). */
+  rawUrl: z.string().min(1),
+});
+export type FileView = z.infer<typeof FileView>;
+
+export const FILE_VIEW_MAX_CHARS = 60_000;

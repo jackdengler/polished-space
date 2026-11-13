@@ -160,6 +160,14 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
     }
   }
 
+  if (method === 'GET' && path === PATHS.brain.files) {
+    const filePath = url.searchParams.get('path') ?? '';
+    const f = FIXTURE_FILES[filePath];
+    if (!f) return json(res, 404, { error: `no file ${filePath}` });
+    const name = filePath.split('/').pop()!;
+    return json(res, 200, { path: filePath, name, folder: filePath.split('/')[0], size: f.length, modified: '2026-11-10T09:00:00.000Z', mimeType: 'text/markdown', text: f, textSource: 'file', truncated: false, rawUrl: PATHS.brain.fileRaw(filePath) });
+  }
+
   if (method === 'GET' && path === PATHS.brain.profiles) {
     return json(res, 200, { profiles: brain.world.profiles.map(({ markdown: _m, ...p }) => p) });
   }
@@ -347,3 +355,11 @@ if (dev) {
 server.listen(port, '127.0.0.1', () => {
   console.log(`fixture brain on http://127.0.0.1:${port} (${dev ? 'vite dev' : staticDir ? `static ${staticDir}` : 'api only'}), now=${clock().toISOString()}`);
 });
+
+/** Fixture copy of the file behind the review_file example (invented content). */
+const FIXTURE_FILES: Record<string, string> = {
+  'Quillon Robotics/Job Levels Draft.md':
+    '# Job Levels Draft\n\nSix levels for engineering, from Associate to Principal.\n\n## Open points\n- Two titles map to two levels at once.\n- Staff and Principal need clearer scope wording.\n- Robotics technicians are not mapped yet.\n',
+  'Acme Tooling/Market Pricing Summary - Draft v2.md':
+    '# Market Pricing Summary (Draft v2)\n\n18 benchmark roles matched to two surveys.\n\n## Findings\n- Engineering midpoints moved up about 3% since the last review.\n- Two roles (Tooling Designer, CNC Lead) have thin survey matches.\n- Sales roles still need a variable pay view.\n',
+};

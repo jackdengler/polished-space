@@ -13,3 +13,4 @@ workspace.json
 backups
 test-results
 artifact
+poc/packages/speech/models

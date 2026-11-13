@@ -8,7 +8,7 @@ import { SourceChip, SuggestionCard } from './SuggestionCard';
 const NUDGE_ICON: Record<Nudge['kind'], IconName> = { new_item: 'sparkle', fit_now: 'clock', info: 'alert' };
 const VISIBLE = 3;
 
-function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: Suggestion[]; total: number }) {
+function NudgeCard({ nudge, suggestions, total, inInbox = 0 }: { nudge: Nudge; suggestions: Suggestion[]; total: number; inInbox?: number }) {
   const now = useUi((s) => s.state?.now ?? nudge.createdAt);
   const expanded = useUi((s) => s.expandedNudges.includes(nudge.id));
   const toggle = useUi((s) => s.toggleNudge);
@@ -32,7 +32,11 @@ function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: S
           <div className="nudge-meta">
             <span>{ago(nudge.createdAt, now)}</span>
             <SourceChip source={nudge.source} />
-            {total > 0 && n === 0 ? (
+            {inInbox > 0 && n === 0 ? (
+              <span className="nudge-done">
+                <Icon name="inbox" size={12} /> Waiting in Inbox
+              </span>
+            ) : total > 0 && n === 0 ? (
               <span className="nudge-done">
                 <Icon name="check" size={12} /> All handled
               </span>
@@ -70,10 +74,12 @@ function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: S
   );
 }
 
-export function Nudges({ items }: { items: { nudge: Nudge; suggestions: Suggestion[]; total: number }[] }) {
+export function Nudges({ items }: { items: { nudge: Nudge; suggestions: Suggestion[]; total: number; inInbox?: number }[] }) {
   const [showAll, setShowAll] = useState(false);
   if (!items.length) return null;
-  const shown = showAll ? items : items.slice(0, VISIBLE);
+  // Older nudges fold away, but never one that still holds a suggestion waiting for a decision.
+  const shown = showAll ? items : items.filter((x, i) => i < VISIBLE || x.suggestions.length > 0);
+  const hidden = items.length - items.filter((x, i) => i < VISIBLE || x.suggestions.length > 0).length;
   return (
     <section className="nudges" aria-label="Nudges">
       <ul className="nudge-list">
@@ -81,9 +87,9 @@ export function Nudges({ items }: { items: { nudge: Nudge; suggestions: Suggesti
           <NudgeCard key={x.nudge.id} {...x} />
         ))}
       </ul>
-      {items.length > VISIBLE ? (
+      {hidden > 0 || showAll ? (
         <button type="button" className="link small more-link" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
-          {showAll ? 'Show fewer' : `Show ${items.length - VISIBLE} older`}
+          {showAll ? 'Show fewer' : `Show ${hidden} older`}
         </button>
       ) : null}
     </section>

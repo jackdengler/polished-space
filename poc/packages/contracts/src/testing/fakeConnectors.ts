@@ -48,7 +48,7 @@ function ticker(start: string): () => string {
 
 export class FakeMailConnector implements MailConnector {
   readonly messages: MailMessage[];
-  readonly sent: { id: string; draft: MailDraft }[] = [];
+  readonly sent: { id: string; draft: MailDraft; at: string }[] = [];
   private seq = 0;
   private tick: () => string;
 
@@ -88,8 +88,31 @@ export class FakeMailConnector implements MailConnector {
 
   async send(draft: MailDraft): Promise<{ id: string }> {
     const id = `fake-sent-${++this.seq}`;
-    this.sent.push({ id, draft });
+    this.sent.push({ id, draft, at: this.tick() });
     return { id };
+  }
+
+  /** Put an already-sent message in the Sent folder (test setup; no approval involved). */
+  seedSent(draft: MailDraft, at: string): void {
+    this.sent.push({ id: `fake-sent-${++this.seq}`, draft, at });
+  }
+
+  async listSent(): Promise<MailMessage[]> {
+    return [...this.sent]
+      .sort((a, b) => a.at.localeCompare(b.at))
+      .map(({ id, draft, at }) => ({
+        id,
+        conversationId: `fake-conv-${id}`,
+        subject: draft.subject,
+        from: { emailAddress: FAKE_ME },
+        toRecipients: draft.to.map((p) => ({ emailAddress: p })),
+        ccRecipients: draft.cc.map((p) => ({ emailAddress: p })),
+        receivedDateTime: at,
+        sentDateTime: at,
+        body: { contentType: 'text' as const, content: draft.body },
+        bodyPreview: makeBodyPreview(draft.body),
+        isRead: true,
+      }));
   }
 }
 

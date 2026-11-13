@@ -8,14 +8,14 @@ sub-folders) inside your own folder. Do not edit core files (`brain.ts`,
 `intake/`, `store/`, `state.ts`, `server.ts`, `modules/`). If you need a core
 change, stop and tell the lead.
 
-| Folder | Builder | Module export | Starts as |
-|---|---|---|---|
-| `src/prioritise/` (+ calendar code in the same folder or `src/prioritise/calendar/`) | 2A | `prioritiseModule` | no-op |
-| `src/prepare/` | 2B | `prepareModule` | `GET /api/tasks/:id/prepared`, `POST /api/tasks/:id/prepare` answer 501 |
-| `src/profiles/` | 2C | `profilesModule` | `GET /api/profiles`, `GET /api/profiles/:clientId` answer 501 |
-| `src/chat/` (+ voice in the same folder or `src/chat/voice/`) | 2D | `chatModule` | `POST /api/chat` answers 501, `WS /api/voice` refused with 501 |
+| Folder | Builder | Factory |
+|---|---|---|
+| `src/prioritise/` (+ `calendar/`) | 2A | `createPrioritiseModule()` |
+| `src/prepare/` | 2B | `createPrepareModule()` |
+| `src/profiles/` | 2C | `createProfilesModule()` |
+| `src/chat/` (+ voice) | 2D | `createChatModule()` |
 
-Replace the stub routes in your own `index.ts` (same method and path).
+All four are built (Phase 2 done); `src/modules/index.ts` lists them in `createModules()`.
 
 ## The API (`src/modules/types.ts`)
 
@@ -24,6 +24,7 @@ export const myModule: BrainModule = {
   name: 'prepare',
   init(ctx) { /* register routes, upgrades, executor overrides; keep ctx */ },
   onMessageTriaged(e) {},    // { source, item, mail?, chat?, triage, suggestions, candidates }
+  onSuggestionsAdded(e) {},  // { suggestions }: new pending suggestions from ANY source (intake, chat/voice, prepare, next steps, blocks)
   onSuggestionApplied(e) {}, // { suggestion, result: { taskIds?, tasksChanged?, calendarChanged? } }
   onSuggestionDenied(e) {},  // { suggestion }
   onSuggestionFailed(e) {},  // { suggestion } (status 'failed', error set)
@@ -37,13 +38,18 @@ export const myModule: BrainModule = {
 Hooks run in the background, outside any approval, and a throw is logged,
 not fatal. Tests wait for them with `await brain.idle()`.
 
+**One module object serves one brain.** Modules keep the `ctx` that `init`
+gave them, so `src/modules/index.ts` exports `createModules()` (fresh
+instances every call) and no singletons. `main.ts` and every test call it per
+brain; `Brain.init` refuses a module object that another brain already bound.
+
 `ctx` (`ModuleContext`) gives you:
 
 | Member | Use |
 |---|---|
 | `ctx.claude` | The only way to call Claude. `parse(meta, req, zodSchema)`, `create(meta, req)`, `stream(meta, req)`. `meta = { call: 'prioritise' \| 'prepare' \| 'chat' \| 'profile', sourceId }`. The model comes from `models.ts`; effort defaults per call type (set `req.effort` to override). Usage logging, the spend cap and `stop_reason` checks are done for you: catch `SpendCapError`, `ClaudeRefusalError`, `ClaudeMaxTokensError`, `ClaudeOutputError`, `ClaudeUnavailableError` from `../claude`. Haiku chat may pass `thinking: 'disabled'` (effort high or below). Never import `@anthropic-ai/sdk` (a test fails if you do, except `import type`). |
-| `ctx.read` | Read-only connectors: `pm.listClients/listTasks`, `mail.get/listSince`, `calendar.view`, `chat.listSince`, `files.list/read`. **There are no write methods here.** |
-| `ctx.suggestions` | `add(newSuggestion)` creates a pending suggestion (validated against the contract; the sidebar updates). `revise(id, fn)` edits a still-pending one (cannot change id, kind or status). `get`, `list`. |
+| `ctx.read` | Read-only connectors: `pm.listClients/listTasks`, `mail.get/listSince/listSent`, `calendar.view`, `chat.listSince`, `files.list/read`. **There are no write methods here.** |
+| `ctx.suggestions` | `add(newSuggestion)` creates a pending suggestion (validated against the contract; the sidebar updates; `onSuggestionsAdded` fires). `revise(id, fn)` edits a still-pending one (cannot change id, kind or status). `retire(id)` takes a pending or failed one off the list when a newer one replaces it (becomes `denied`, error "Replaced by a newer version."; runs nothing). `get`, `list`. |
 | `ctx.taskMeta` | The overlay: `get`, `all`, `upsert(taskId, patch)`, `upsertMany`. Order, quick win, reason, prepared work, `preparedStatus`, `preparedSuggestionId`, on hold. |
 | `ctx.nudges.add({ kind, text, source, suggestionIds?, taskId? })` | `fit_now` (with `taskId`), `new_item`, `info`. Pushed to the sidebar as an SSE `nudge`. |
 | `ctx.intake.submitText(text, 'manual' \| 'voice')` | Same triage as typed input; returns the suggestions. |

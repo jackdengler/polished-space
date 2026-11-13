@@ -82,4 +82,3 @@ export function createPrepareModule(): PrepareModule {
   };
 }
 
-export const prepareModule: PrepareModule = createPrepareModule();

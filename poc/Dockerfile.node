@@ -21,12 +21,18 @@ COPY poc/packages/sidebar/package.json poc/packages/sidebar/
 COPY poc/seed/package.json poc/seed/
 RUN npm --prefix poc ci --no-audit --no-fund
 
-# Sources (see Dockerfile.node.dockerignore for what is left out).
+# Sources (see Dockerfile.node.dockerignore for what is left out; it excludes
+# every dist/, so the Planr build is made here).
 COPY . .
+
+# The Planr test copy that pm-server serves from /repo/dist (repo-root Vite build).
+RUN npx vite build \
+ && test -f /repo/dist/index.html
 
 ENV NODE_ENV=production \
     POC_DATA_DIR=/data
 WORKDIR /repo/poc
 
-# Each compose service sets its own command, e.g. `npm run start -w @poc/mocks`.
+# Each compose service sets its own command, e.g. `node --import tsx packages/mocks/src/server.ts`
+# (node directly, not npm, so SIGTERM reaches the process for a clean stop).
 CMD ["node", "-e", "console.log('set a command per service'); process.exit(1)"]

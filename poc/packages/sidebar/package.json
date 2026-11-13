@@ -3,12 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "The assistant sidebar: living task list, nudges, approvals, chat and live voice. React 19 + Vite + zustand.",
+  "description": "The assistant sidebar: living task list, nudges, approvals, chat and live voice. React 19 + Vite + zustand. Runtime: the gateway serves dist/ and proxies /api to the real brain; fixture/ is a dev and test tool only.",
   "scripts": {
     "dev": "tsx fixture/server.ts --port 5190 --dev",
     "build": "vite build",
     "fixture": "vite build && tsx fixture/server.ts --port 5190 --static dist",
-    "start": "vite build && tsx fixture/server.ts --port 5190 --static dist",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "e2e": "vite build && node e2e/walkthrough.mjs"
   },

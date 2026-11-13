@@ -7,7 +7,7 @@ import type { SuggestionKind } from '@poc/contracts';
 import { outsideApproval } from '../guard';
 import type { BrainModule, Executor, HttpMethod, RouteHandler, UpgradeHandler } from './types';
 
-type HookName = 'onMessageTriaged' | 'onSuggestionApplied' | 'onSuggestionDenied' | 'onSuggestionFailed' | 'onTasksChanged' | 'onCalendarChanged' | 'onTick';
+type HookName = 'onMessageTriaged' | 'onSuggestionsAdded' | 'onSuggestionApplied' | 'onSuggestionDenied' | 'onSuggestionFailed' | 'onTasksChanged' | 'onCalendarChanged' | 'onTick';
 type HookArg<H extends HookName> = Parameters<NonNullable<BrainModule[H]>>[0];
 
 interface Route {

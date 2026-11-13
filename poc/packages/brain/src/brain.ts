@@ -6,12 +6,14 @@ import { join } from 'node:path';
 import type { Server } from 'node:http';
 import {
   DATA_LAYOUT,
+  FILE_VIEW_MAX_CHARS,
   HoldBody,
   InputBody,
   PATHS,
   addDaysIso,
   zonedTime,
   type CalEvent,
+  type FileView,
   type PmClient,
   type PmTask,
   type SidebarState,
@@ -26,11 +28,12 @@ import { IntakeService } from './intake/service';
 import { Registry } from './modules/registry';
 import type { ApplyResult, BrainModule, ModuleContext, TasksChangedEvent } from './modules/types';
 import { ProfileFiles } from './profileFiles';
+import { pdfText } from './files/pdfText';
 import { createBrainServer, SseHub, sendJson } from './server';
 import { buildState } from './state';
 import { CursorStore } from './store/cursors';
 import { NudgeStore } from './store/nudges';
-import { SuggestionStore } from './store/suggestions';
+import { SuggestionConflictError, SuggestionStore } from './store/suggestions';
 import { TaskMetaStore } from './store/taskMeta';
 import { UsageLog } from './usage';
 
@@ -45,6 +48,9 @@ export interface BrainDeps {
 }
 
 const CLIENTS_TTL_MS = 5_000;
+
+/** Module objects already bound to a brain: one object serves one brain (see modules/index.ts). */
+const boundModules = new WeakSet<BrainModule>();
 
 export class Brain {
   readonly config: BrainConfig;
@@ -89,6 +95,7 @@ export class Brain {
     this.read = readOnly(this.writes);
 
     this.suggestions.onChange(() => this.stateChanged());
+    this.suggestions.onAdded((made) => this.registry.emit('onSuggestionsAdded', { suggestions: made }));
     this.taskMeta.onChange(() => this.stateChanged());
     this.nudges.onNudge((n) => {
       this.sse.broadcast('nudge', n);
@@ -131,6 +138,8 @@ export class Brain {
   async init(): Promise<void> {
     await Promise.all([this.suggestions.load(), this.taskMeta.load(), this.cursors.load(), this.usage.load()]);
     for (const m of this.modules) {
+      if (boundModules.has(m)) throw new Error(`module "${m.name}" is already bound to another brain; use createModules() for fresh instances`);
+      boundModules.add(m);
       this.registry.modules.push(m);
       await m.init?.(this.moduleContext(m.name));
     }
@@ -308,6 +317,15 @@ export class Brain {
             if (next.id !== cur.id || next.kind !== cur.kind || next.status !== cur.status) throw new Error('revise cannot change id, kind or status');
             return next;
           }),
+        retire: async (id, reason = 'Replaced by a newer version.') => {
+          try {
+            this.suggestions.claim(id, ['pending', 'failed'], 'denied');
+          } catch (err) {
+            if (err instanceof SuggestionConflictError) return null;
+            throw err;
+          }
+          return this.suggestions.update(id, (s) => ({ ...s, status: 'denied', error: reason, decidedAt: this.config.clock.now().toISOString() }));
+        },
       },
       taskMeta: {
         get: (id) => this.taskMeta.get(id),
@@ -372,6 +390,36 @@ export class Brain {
       sendJson(res, 200, await this.setHold(params.id!, parsed.data.onHold));
     });
     add('GET', PATHS.brain.usage, ({ res }) => sendJson(res, 200, this.usage.response()));
+    add('GET', PATHS.brain.files, async ({ res, url }) => sendJson(res, 200, await this.fileView(url.searchParams.get('path'))));
+    add('GET', PATHS.brain.filesRaw, async ({ res, url }) => {
+      const file = await this.readClientFile(url.searchParams.get('path'));
+      const body = Buffer.from(file.content, file.encoding);
+      const name = encodeURIComponent(file.name);
+      res.writeHead(200, { 'content-type': file.mimeType === 'application/pdf' ? 'application/pdf' : `${file.mimeType}; charset=utf-8`, 'content-length': body.length, 'content-disposition': `inline; filename*=UTF-8''${name}`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      res.end(body);
+    });
+  }
+
+  /** Read one file from the fake file server (read-only connector; paths outside its root are refused). */
+  private async readClientFile(path: string | null) {
+    if (!path) throw new HttpProblem(400, 'expected ?path=<client folder>/<file>');
+    try {
+      return await this.read.files.read(path);
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (/outside files root|unsupported file type/.test(msg)) throw new HttpProblem(400, msg);
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT' || /no file|not found/i.test(msg)) throw new HttpProblem(404, `no file ${path}`);
+      throw err;
+    }
+  }
+
+  /** `GET /api/files?path=`: the file next to its review (FileView). */
+  async fileView(path: string | null): Promise<FileView> {
+    const file = await this.readClientFile(path);
+    const { content, encoding, ...info } = file;
+    const full = encoding === 'base64' ? pdfText(Buffer.from(content, 'base64')) : content;
+    const truncated = full.length > FILE_VIEW_MAX_CHARS;
+    return { ...info, text: truncated ? full.slice(0, FILE_VIEW_MAX_CHARS) : full, textSource: encoding === 'base64' ? 'pdf_text' : 'file', truncated, rawUrl: PATHS.brain.fileRaw(info.path) };
   }
 }
 

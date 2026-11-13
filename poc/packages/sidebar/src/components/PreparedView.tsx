@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PreparedResponse, PreparedWork, SidebarTask, Suggestion } from '@poc/contracts';
+import type { FileView, PreparedResponse, PreparedWork, SidebarTask, Suggestion } from '@poc/contracts';
 import { api, ApiError } from '../api';
 import { useUi } from '../store';
 import { DIRECTION_LABEL, TASK_TYPE_LABEL, relativeDue } from '../format';
@@ -13,6 +13,50 @@ const TITLES: Record<PreparedWork['type'], string> = {
   follow_up: 'Drafted chaser',
   other: 'What I gathered',
 };
+
+/** The reviewed file itself, read from the fake file server through the brain. */
+function FileBlock({ path }: { path: string }) {
+  const [file, setFile] = useState<FileView | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setFile(null);
+    setError(null);
+    api.file(path).then(
+      (f) => live && setFile(f),
+      (e: unknown) => live && setError(e instanceof Error ? e.message : 'Could not open the file.'),
+    );
+    return () => {
+      live = false;
+    };
+  }, [path]);
+  return (
+    <section className="file-view" aria-label="The file">
+      <p className="file-path">
+        <Icon name="file" size={14} />
+        <span className="mono">{path}</span>
+        {file ? (
+          <a className="file-open" href={file.rawUrl} target="_blank" rel="noreferrer">
+            Open
+          </a>
+        ) : null}
+      </p>
+      {error ? (
+        <p className="muted">I couldn’t open the file: {error}</p>
+      ) : !file ? (
+        <p className="muted">Opening the file…</p>
+      ) : (
+        <>
+          {file.textSource === 'pdf_text' ? <p className="file-note">Text taken from the PDF (layout not kept). Use Open to see the PDF.</p> : null}
+          <pre className="file-text" tabIndex={0} data-file-text>
+            {file.text || '(no text found in this file)'}
+            {file.truncated ? '\n…' : ''}
+          </pre>
+        </>
+      )}
+    </section>
+  );
+}
 
 function Work({ prepared, suggestion, tasks, editing }: { prepared: PreparedWork; suggestion: Suggestion | null; tasks: SidebarTask[]; editing: boolean }) {
   const draftFromSuggestion = suggestion?.kind === 'send_reply' ? suggestion : null;
@@ -63,10 +107,7 @@ function Work({ prepared, suggestion, tasks, editing }: { prepared: PreparedWork
     case 'review_file':
       return (
         <>
-          <p className="file-path">
-            <Icon name="file" size={14} />
-            <span className="mono">{prepared.path}</span>
-          </p>
+          <FileBlock path={prepared.path} />
           <h3 className="pw-sub">Summary</h3>
           <p className="pw-text">{prepared.summary}</p>
           <h3 className="pw-sub">Key points</h3>

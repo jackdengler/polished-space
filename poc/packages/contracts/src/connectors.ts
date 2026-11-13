@@ -29,6 +29,11 @@ import type { SttEvent } from './voice';
 export interface MailConnector {
   listSince(cursor: string): Promise<{ items: MailMessage[]; cursor: string }>;
   get(id: string): Promise<MailMessage>;
+  /**
+   * The Sent Items folder (Graph `mailFolders/sentitems/messages`), oldest
+   * first. Read only: used to quote the unanswered email in a follow-up.
+   */
+  listSent(): Promise<MailMessage[]>;
   /** Sends through Graph sendMail; the mock files it in Sent. Returns the sent message's id. */
   send(draft: MailDraft): Promise<{ id: string }>;
 }

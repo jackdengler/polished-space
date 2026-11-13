@@ -6,8 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { FakeClaude } from '@poc/contracts/testing';
 import { z } from 'zod';
-import { Claude, ClaudeRefusalError, ClaudeRequestError, ClaudeUnavailableError, createAnthropicClient, isAbortError, type AnthropicLike } from './claude';
-import { makeClock } from './config';
+import { Claude, ClaudeRefusalError, ClaudeRequestError, ClaudeUnavailableError, clientBaseUrl, createAnthropicClient, isAbortError, type AnthropicLike } from './claude';
+import { loadConfig, makeClock } from './config';
 import { TriageOutput, buildTriageRequest } from './intake/triage';
 import { estimateUsd } from './models';
 import { CLIENTS, ME, NOW, makeDataDir } from './testing/harness';
@@ -114,7 +114,7 @@ describe('Claude wrapper', () => {
   });
 
   it('without credentials the client is null and every call fails clearly, sending nothing', async () => {
-    expect(createAnthropicClient({ anthropicBaseUrl: undefined }, {})).toBeNull();
+    expect(createAnthropicClient({ anthropicBaseUrl: 'https://api.anthropic.com' }, {})).toBeNull();
     const dir = await makeDataDir();
     const clock = makeClock('UTC', null, () => new Date(NOW));
     const claude = new Claude(null, new UsageLog(join(dir, 'logs/usage.jsonl'), clock), { maxUsdPerDay: 5, fallbacks: true, clock });
@@ -164,7 +164,7 @@ describe('triage prompt layout', () => {
 
 // ---- the real SDK against a local stand-in for the Messages API ------------
 
-describe('real SDK through ANTHROPIC_BASE_URL (no network, no key)', () => {
+describe('real SDK through POC_CLAUDE_BASE_URL (no network, no key)', () => {
   const seen: { path: string; headers: IncomingMessage['headers']; body: Record<string, unknown> }[] = [];
   let baseUrl = '';
   const server = createServer(async (req, res) => {
@@ -190,27 +190,45 @@ describe('real SDK through ANTHROPIC_BASE_URL (no network, no key)', () => {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify(message([{ type: 'text', text }])));
   });
-  const saved = { base: process.env.ANTHROPIC_BASE_URL, key: process.env.ANTHROPIC_API_KEY };
+  const saved = { key: process.env.ANTHROPIC_API_KEY };
 
   beforeAll(async () => {
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    process.env.ANTHROPIC_BASE_URL = baseUrl;
     process.env.ANTHROPIC_API_KEY = 'dummy-local-test-value';
   });
   afterAll(async () => {
-    process.env.ANTHROPIC_BASE_URL = saved.base;
     process.env.ANTHROPIC_API_KEY = saved.key;
-    if (saved.base === undefined) delete process.env.ANTHROPIC_BASE_URL;
     if (saved.key === undefined) delete process.env.ANTHROPIC_API_KEY;
     await new Promise<void>((r) => server.close(() => r()));
   });
 
-  it('create, parse (zod 4) and stream all go to ANTHROPIC_BASE_URL with the fallback beta header', async () => {
+  it('an ambient ANTHROPIC_BASE_URL is ignored: only POC_CLAUDE_BASE_URL (or the public API) is used', () => {
+    const ambient = 'http://ambient-tool.invalid:9';
+    const withAmbient = loadConfig({ ANTHROPIC_BASE_URL: ambient, POC_DATA_DIR: '/nonexistent-poc-data' });
+    expect(withAmbient.anthropicBaseUrl).toBe('https://api.anthropic.com');
+    const set = loadConfig({ ANTHROPIC_BASE_URL: ambient, POC_CLAUDE_BASE_URL: baseUrl, POC_DATA_DIR: '/nonexistent-poc-data' });
+    expect(set.anthropicBaseUrl).toBe(baseUrl);
+    const saved = process.env.ANTHROPIC_BASE_URL;
+    process.env.ANTHROPIC_BASE_URL = ambient;
+    try {
+      expect(clientBaseUrl(createAnthropicClient(withAmbient))).toBe('https://api.anthropic.com');
+      expect(clientBaseUrl(createAnthropicClient(set))).toBe(baseUrl);
+    } finally {
+      if (saved === undefined) delete process.env.ANTHROPIC_BASE_URL;
+      else process.env.ANTHROPIC_BASE_URL = saved;
+    }
+  });
+
+  it('create, parse (zod 4) and stream all go to POC_CLAUDE_BASE_URL with the fallback beta header', async () => {
     const dir = await makeDataDir();
     const clock = makeClock('UTC', null, () => new Date(NOW));
     const usage = new UsageLog(join(dir, 'logs/usage.jsonl'), clock);
-    const client = createAnthropicClient({ anthropicBaseUrl: undefined }); // the SDK reads ANTHROPIC_BASE_URL itself
+    const saved = process.env.ANTHROPIC_BASE_URL;
+    process.env.ANTHROPIC_BASE_URL = 'http://ambient-tool.invalid:9'; // must be ignored
+    const client = createAnthropicClient(loadConfig({ POC_CLAUDE_BASE_URL: baseUrl, POC_DATA_DIR: '/nonexistent-poc-data' }));
+    if (saved === undefined) delete process.env.ANTHROPIC_BASE_URL;
+    else process.env.ANTHROPIC_BASE_URL = saved;
     expect(client).not.toBeNull();
     const claude = new Claude(client, usage, { maxUsdPerDay: 5, fallbacks: true, clock });
 

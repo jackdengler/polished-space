@@ -1,13 +1,15 @@
 # AI Work Assistant POC sandbox (plan section 3.1).
 #
-#   npm --prefix poc run seed                      # creates poc/data/
-#   docker compose -f poc/docker-compose.yml up --build
+#   npm --prefix poc run up       # seed if needed, build, start, wait for health
+#   npm --prefix poc run reset    # stop, fresh seed, start
+#   npm --prefix poc run down     # stop
+#   sh poc/scripts/check-isolation.sh   # on the laptop, after `up`
 #
 # Every service sits on `sandbox` (internal: no route out). Only `gateway`
-# also sits on `edge`; it forwards outbound traffic to api.anthropic.com
-# only. Host ports bind to 127.0.0.1. All data lives in poc/data (gitignored).
-# Commands for services not built yet are placeholders (each package's
-# `start` script); builders replace the script, not this file.
+# also sits on `edge`; its 8443 listener forwards to api.anthropic.com and
+# nothing else. Host ports bind to 127.0.0.1 only. All data lives in
+# poc/data (gitignored). The API key comes from poc/.env (gitignored) and only
+# the brain receives it.
 
 name: planr-poc
 
@@ -30,45 +32,62 @@ x-common-env: &common-env
   TZ: ${POC_TZ:-UTC}
   POC_NOW: ${POC_NOW:-}
 
+x-health: &health
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 10s
+
 services:
   gateway:
-    image: nginx:1.27-alpine
+    build:
+      context: ..
+      dockerfile: poc/Dockerfile.gateway
+    image: planr-poc-gateway:dev
     restart: unless-stopped
     networks: [sandbox, edge]
     ports:
       - "127.0.0.1:5180:5180"   # sidebar + /api -> brain
       - "127.0.0.1:5181:5181"   # Planr test copy -> pm:8080
       - "127.0.0.1:5182:5182"   # mocks control page -> mocks:8090
-    volumes:
-      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./packages/sidebar/dist:/usr/share/nginx/html:ro
+    depends_on:
+      brain: { condition: service_healthy }
+      pm: { condition: service_healthy }
+      mocks: { condition: service_healthy }
 
   pm:
     <<: *node-service
-    command: ["npm", "run", "start", "-w", "@poc/pm-server"]
+    command: ["node", "--import", "tsx", "packages/pm-server/src/main.ts"]
     environment:
       <<: *common-env
     volumes:
       - ./data/pm:/data/pm
+    healthcheck:
+      <<: *health
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
   mocks:
     <<: *node-service
-    command: ["npm", "run", "start", "-w", "@poc/mocks"]
+    command: ["node", "--import", "tsx", "packages/mocks/src/server.ts"]
     environment:
       <<: *common-env
     volumes:
       - ./data:/data:ro
       - ./data/mocks:/data/mocks
+    healthcheck:
+      <<: *health
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/_control/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
   brain:
     <<: *node-service
-    command: ["npm", "run", "start", "-w", "@poc/brain"]
+    command: ["node", "--import", "tsx", "packages/brain/src/main.ts"]
     env_file:
       - path: .env               # ANTHROPIC_API_KEY lives here (gitignored)
         required: false
     environment:
       <<: *common-env
-      ANTHROPIC_BASE_URL: http://gateway:8443
+      # The brain reads ONLY this for its Claude endpoint (never ANTHROPIC_BASE_URL).
+      POC_CLAUDE_BASE_URL: http://gateway:8443
       PM_MCP_URL: http://pm:8081/mcp
       MOCKS_URL: http://mocks:8090
       SPEECH_URL: http://speech:7100
@@ -78,7 +97,13 @@ services:
       - ./data/brain:/data/brain
       - ./data/profiles:/data/profiles
       - ./data/logs:/data/logs
-    depends_on: [pm, mocks, speech]
+    depends_on:
+      pm: { condition: service_healthy }
+      mocks: { condition: service_healthy }
+      speech: { condition: service_healthy }
+    healthcheck:
+      <<: *health
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
   speech:
     build:

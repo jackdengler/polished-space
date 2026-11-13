@@ -15,7 +15,7 @@
  * nothing here can reach an outside system (only ctx.read and the profile files).
  */
 import { join } from 'node:path';
-import { localMinutes, PATHS, profileSlug, type Direction, type EditableProfileSection, type PmClient, type ProfileDoc, type ProfileListResponse, type ProfileSummary, type Suggestion } from '@poc/contracts';
+import { localMinutes, parseProfile, PATHS, profileSlug, type Direction, type EditableProfileSection, type PmClient, type ProfileDoc, type ProfileListResponse, type ProfileSummary, type Suggestion } from '@poc/contracts';
 import { ClaudeError } from '../claude';
 import { HttpProblem } from '../httpProblem';
 import type { BrainModule, ModuleContext, SuggestionAppliedEvent } from '../modules/types';
@@ -171,7 +171,16 @@ export class ProfilesFeature {
     if (!c || !taskId) return;
     const entry: Omit<TaskEntry, 'bullet'> = { clientId: c.id, section: commitmentSection(s.direction), title: s.payload.title, dueDate: s.payload.dueDate, focus: null, done: null };
     const bullet = taskBullet(entry);
-    await this.apply(c, [{ section: entry.section, op: 'add', text: bullet }], `Task approved: ${s.payload.title}`);
+    // Triage may already have noted this commitment (same words, no date yet): update that line instead of adding a twin.
+    const md = (await this.ctx.profiles.read(c.name)) ?? '';
+    const norm = (t: string) => cleanText(t).toLowerCase().replace(/[.\s]+$/, '');
+    const body = parseProfile(md).sections[entry.section] ?? '';
+    const existing = body
+      .split('\n')
+      .map((l) => l.replace(/^\s*[-*]\s+/, '').trim())
+      .find((l) => l && norm(l) === norm(entry.title));
+    const edit = existing ? { section: entry.section, op: 'replace', text: bullet, match: existing } : { section: entry.section, op: 'add', text: bullet };
+    await this.apply(c, [edit], `Task approved: ${s.payload.title}`);
     this.index[taskId] = { ...entry, bullet };
     await this.tasks.save(this.index);
   }
@@ -238,4 +247,3 @@ export function createProfilesModule(): BrainModule & { feature(): ProfilesFeatu
   };
 }
 
-export const profilesModule = createProfilesModule();

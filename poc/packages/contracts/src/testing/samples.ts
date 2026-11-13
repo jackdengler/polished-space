@@ -171,6 +171,7 @@ export const SAMPLES: Record<string, Sample> = {
 
   FileInfo: { schema: c.FileInfo, valid: fileInfo, invalid: { ...fileInfo, path: '../etc/passwd' } },
   FileContent: { schema: c.FileContent, valid: { ...fileInfo, encoding: 'utf8', content: 'a,b\n1,2\n' }, invalid: { ...fileInfo, encoding: 'hex', content: '00' } },
+  FileView: { schema: c.FileView, valid: { ...fileInfo, text: 'a,b\n1,2\n', textSource: 'file', truncated: false, rawUrl: '/api/files/raw?path=x' }, invalid: { ...fileInfo, text: 'x', textSource: 'ocr', truncated: false, rawUrl: '' } },
 
   FlexDate: { schema: c.FlexDate, valid: { kind: 'range', label: 'Q1 2027', start: '2027-01-01', end: '2027-03-31' }, invalid: { kind: 'exact', date: '11/20/26' } },
   ListClientsInput: { schema: c.ListClientsInput, valid: {}, invalid: null },

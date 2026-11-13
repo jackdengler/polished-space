@@ -49,8 +49,10 @@ done for every workspace package).
 - `MailDraft` is the POC's own shape (plain text body, `Person` recipients, `replyToMessageId`). Graph has no "reply to" field on `sendMail`, so it is not sent; the subject says "Re: ...".
 - Zoom: real Zoom lists one conversation at a time and needs `to_contact` or `to_channel`. The mock accepts just `from` and returns all of the user's chats, oldest first. In a 1:1 chat, `to_contact` is the *other* person (as seen from "me"). `channel_name` is a mock-only extra for labels. Messages sent by "me" appear too; the brain skips them.
 - Cursor rule for `listSince`: opaque string, `''` = from the start, returns items strictly after the cursor, oldest first. The POC uses the last item's timestamp. `/_control/mail` always stamps a dropped message later than the newest stored one, so `gt` never misses it.
+- Sent folder: `MailConnector.listSent()` reads Graph `GET /v1.0/me/mailFolders/sentitems/messages` (oldest first). Read only; the brain uses it to quote the unanswered email in a follow-up chaser.
 - Extra control endpoints: `GET /_control/canned` (the canned messages) and `GET /_control/sent` (the Sent folder), for the control page and e2e.
 - `FileContent`: text types are `utf8`, PDFs are `base64` (ready for a Claude document block). Only `.txt`, `.md`, `.csv`, `.pdf` exist.
+- `GET /api/files?path=` (brain, read only) returns `FileView`: the file's info plus its text (`textSource: 'file'`), or for a PDF the text taken from its content streams (`'pdf_text'`, layout not kept), capped at `FILE_VIEW_MAX_CHARS`, and `rawUrl` = `GET /api/files/raw?path=` which serves the file itself (PDF inline). Paths outside the fake file server are a 400. The sidebar shows it in the file-review view.
 
 **PM / MCP**
 
@@ -78,6 +80,7 @@ done for every workspace package).
 - Precedence: on hold, then Internal client, then undated (Inbox), then by date.
 - `SidebarState` also carries `today`, `me` and `clients` (for the client picker). `suggestions` holds pending and failed only, newest first. `nudges` newest first, at most 20. Every section is present even when empty.
 - `Nudge.kind`: `new_item`, `fit_now` (with `taskId`), `info`.
+- The brain's Claude endpoint is `POC_CLAUDE_BASE_URL` (`ENV.claudeBaseUrl`; default `https://api.anthropic.com`; compose sets the gateway). The brain never reads `ANTHROPIC_BASE_URL`.
 - `POST /api/input` responds `{ suggestions }`. `GET /api/usage` responds `{ today, days }`. `GET /api/profiles` responds `{ profiles }`.
 
 **Voice**

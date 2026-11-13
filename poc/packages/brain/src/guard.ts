@@ -45,7 +45,7 @@ function check(method: string): void {
 }
 
 export type PmReader = Pick<PmConnector, 'listClients' | 'listTasks'>;
-export type MailReader = Pick<MailConnector, 'listSince' | 'get'>;
+export type MailReader = Pick<MailConnector, 'listSince' | 'get' | 'listSent'>;
 export type CalendarReader = Pick<CalendarConnector, 'view'>;
 
 export interface Connectors {
@@ -85,6 +85,7 @@ export function guardConnectors(c: Connectors): Connectors {
   const mail: MailConnector = {
     listSince: (cur) => c.mail.listSince(cur),
     get: (id) => c.mail.get(id),
+    listSent: () => c.mail.listSent(),
     send: async (d) => {
       check('sendMail');
       return c.mail.send(d);
@@ -103,7 +104,7 @@ export function guardConnectors(c: Connectors): Connectors {
 export function readOnly(c: Connectors): ReadConnectors {
   return {
     pm: { listClients: () => c.pm.listClients(), listTasks: (q) => c.pm.listTasks(q) },
-    mail: { listSince: (cur) => c.mail.listSince(cur), get: (id) => c.mail.get(id) },
+    mail: { listSince: (cur) => c.mail.listSince(cur), get: (id) => c.mail.get(id), listSent: () => c.mail.listSent() },
     calendar: { view: (s, e) => c.calendar.view(s, e) },
     chat: c.chat,
     files: c.files,

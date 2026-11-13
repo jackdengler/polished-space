@@ -1,12 +1,16 @@
 /**
- * The brain's modules, one per Phase 2 builder. Each lives in its own folder
- * and exports one BrainModule from that folder's index.ts; this list already
- * names all four, so no builder needs to edit it.
+ * The brain's modules. Module objects keep the context `init` gave them, so
+ * one object can serve only one brain: `createModules()` returns FRESH
+ * instances every call. The production entry point and every test that
+ * starts a brain call it once per brain. There are deliberately no shared
+ * module singletons to import.
  */
-import { chatModule } from '../chat';
-import { prepareModule } from '../prepare';
-import { prioritiseModule } from '../prioritise';
-import { profilesModule } from '../profiles';
+import { createChatModule } from '../chat';
+import { createPrepareModule } from '../prepare';
+import { createPrioritiseModule } from '../prioritise';
+import { createProfilesModule } from '../profiles';
 import type { BrainModule } from './types';
 
-export const MODULES: BrainModule[] = [profilesModule, prioritiseModule, prepareModule, chatModule];
+export function createModules(): BrainModule[] {
+  return [createProfilesModule(), createPrioritiseModule(), createPrepareModule(), createChatModule()];
+}

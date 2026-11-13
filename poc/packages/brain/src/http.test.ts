@@ -2,17 +2,17 @@
 import { connect } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
-import { InputResponse, PATHS, SidebarState, UsageResponse } from '@poc/contracts';
-import { MODULES } from './modules';
+import { FileView, InputResponse, PATHS, PreparedResponse, ProfileDoc, ProfileListResponse, SidebarState, UsageResponse } from '@poc/contracts';
+import { createModules } from './modules';
 import type { BrainModule } from './modules/types';
-import { makeHarness, michaelMail, triage, type Harness } from './testing/harness';
+import { TODAY, makeHarness, michaelMail, task, triage, type Harness } from './testing/harness';
 
 const running: Harness[] = [];
 afterEach(async () => {
   for (const h of running.splice(0)) await h.brain.stop();
 });
 
-async function up(modules: BrainModule[] = MODULES, opts: Parameters<typeof makeHarness>[0] = {}) {
+async function up(modules: BrainModule[] = createModules(), opts: Parameters<typeof makeHarness>[0] = {}) {
   const h = await makeHarness({ modules, ...opts });
   await new Promise<void>((r) => h.brain.server.listen(0, '127.0.0.1', () => r()));
   running.push(h);
@@ -93,7 +93,7 @@ describe('core routes', () => {
   });
 
   it('maps the spend cap on typed input to 429', async () => {
-    const { call } = await up(MODULES, { maxUsdPerDay: 0 });
+    const { call } = await up(createModules(), { maxUsdPerDay: 0 });
     const r = await call('POST', PATHS.brain.input, { text: 'chase Michael' });
     expect(r.status).toBe(429);
     expect(r.body.error).toMatch(/cap/);
@@ -120,29 +120,78 @@ describe('core routes', () => {
 });
 
 describe('modules', () => {
-  it('Phase 2 stub routes answer 501, and WS /api/voice is refused with 501', async () => {
-    const { base, call } = await up();
-    for (const [m, p] of [
-      ['POST', PATHS.brain.chat],
-      ['GET', PATHS.brain.prepared('t-1')],
-      ['POST', PATHS.brain.prepare('t-1')],
-      ['GET', PATHS.brain.profiles],
-      ['GET', PATHS.brain.profile('poc-client-acme')],
-    ] as const) {
-      const r = await call(m, p, m === 'POST' ? {} : undefined);
-      expect(r.status, `${m} ${p}`).toBe(501);
-      expect(r.body.error).toMatch(/not built yet/);
-    }
+  it('the real module routes answer with their contract shapes, and WS /api/voice upgrades', async () => {
+    const { h, base, call } = await up();
+    // Chat: bad body is a 400; a real turn streams delta ... done as SSE.
+    expect((await call('POST', PATHS.brain.chat, {})).status).toBe(400);
+    h.claude.setDefault({ text: 'Your next meeting is at 15:30.' });
+    const chat = await fetch(base + PATHS.brain.chat, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'when is my next meeting?' }) });
+    expect(chat.headers.get('content-type')).toMatch(/text\/event-stream/);
+    const sse = await chat.text();
+    expect(sse).toMatch(/event: delta\n/);
+    const done = /event: done\ndata: (.+)\n/.exec(sse)![1]!;
+    expect(JSON.parse(done)).toEqual({ text: 'Your next meeting is at 15:30.' });
+
+    // Prepared work: unknown task 404; a real task answers PreparedResponse.
+    expect((await call('GET', PATHS.brain.prepared('t-none'))).status).toBe(404);
+    expect((await call('POST', PATHS.brain.prepare('t-none'), {})).status).toBe(404);
+    h.pm.tasks.push(task('t-acme-1', 'poc-client-acme', 'Reply to Michael', TODAY));
+    h.claude.setDefault({ parsed: { summary: 'Context.', notes: [], nextStep: { kind: 'none', title: '', nudge: '', toName: null, subject: '', body: '', dueDate: null, taskType: 'other' } } });
+    const prep = await call('GET', PATHS.brain.prepared('t-acme-1'));
+    expect(prep.status).toBe(200);
+    PreparedResponse.parse(prep.body);
+    expect((await call('POST', PATHS.brain.prepare('t-acme-1'), {})).status).toBe(202);
+
+    // Profiles.
+    const list = ProfileListResponse.parse((await call('GET', PATHS.brain.profiles)).body);
+    expect(list.profiles.map((p) => p.clientId)).toContain('poc-client-acme');
+    const doc = ProfileDoc.parse((await call('GET', PATHS.brain.profile('poc-client-acme'))).body);
+    expect(doc.markdown).toContain('# Acme Tooling Co.');
+    expect((await call('GET', PATHS.brain.profile('poc-client-nobody'))).status).toBe(404);
+
+    // Files: text served as is; outside the root refused.
+    const file = FileView.parse((await call('GET', PATHS.brain.file('Acme Tooling/benchmark_matches.csv'))).body);
+    expect(file).toMatchObject({ textSource: 'file', text: 'job,match\n', truncated: false });
+    expect((await call('GET', PATHS.brain.file('../secrets.txt'))).status).toBe(400);
+    expect((await call('GET', PATHS.brain.files)).status).toBe(400);
+    expect((await call('GET', PATHS.brain.file('Acme Tooling/missing.md'))).status).toBe(404);
+
+    // Voice: the upgrade is accepted (101 Switching Protocols).
     const port = new URL(base).port;
     const reply = await new Promise<string>((resolve) => {
       const sock = connect(Number(port), '127.0.0.1', () => {
         sock.write(`GET ${PATHS.brain.voice} HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`);
       });
       let data = '';
-      sock.on('data', (d) => (data += d));
+      sock.on('data', (d) => {
+        data += d;
+        if (data.includes('\r\n\r\n')) sock.destroy();
+      });
       sock.on('close', () => resolve(data));
     });
-    expect(reply).toMatch(/^HTTP\/1.1 501/);
+    expect(reply).toMatch(/^HTTP\/1.1 101/);
+    await h.brain.idle();
+  });
+
+  it('a module object can serve only one brain; createModules() gives fresh ones', async () => {
+    const mods = createModules();
+    await up(mods);
+    await expect(makeHarness({ modules: [mods[0]!] })).rejects.toThrow(/already bound/);
+    const again = createModules();
+    expect(again.every((m, i) => m !== mods[i])).toBe(true);
+    await up(again); // fresh instances start fine
+  });
+
+  it('suggestions from ANY source fire onSuggestionsAdded (chat propose_* included)', async () => {
+    const seen: string[][] = [];
+    const mod: BrainModule = { name: 'watch', onSuggestionsAdded: (e) => void seen.push(e.suggestions.map((s) => s.kind)) };
+    const { h } = await up([mod]);
+    const ctx = h.brain.moduleContext('chat');
+    await ctx.suggestions.add({ kind: 'create_task', title: 'Chase Michael', nudge: 'n', clientId: 'poc-client-acme', clientConfidence: 'high', source: { connector: 'manual', id: 'chat-1', label: 'Chat' }, direction: 'i_owe', taskType: 'follow_up', duplicateOf: null, payload: { title: 'Chase Michael', dueDate: '2026-11-20', assigneeIds: [] } });
+    h.claude.enqueue({ parsed: triage() });
+    await h.brain.intake.submitText('reply to Michael', 'manual');
+    await h.brain.idle();
+    expect(seen).toEqual([['create_task'], ['create_task', 'create_task']]);
   });
 
   it('module routes, executor overrides and hooks plug in; clashes are refused', async () => {

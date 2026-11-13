@@ -58,7 +58,13 @@ export const ENV = {
   dataDir: 'POC_DATA_DIR',
   maxUsdPerDay: 'POC_MAX_USD_PER_DAY',
   anthropicKey: 'ANTHROPIC_API_KEY',
-  anthropicBaseUrl: 'ANTHROPIC_BASE_URL',
+  /**
+   * Where the brain sends Claude requests. POC-specific on purpose: the
+   * brain never reads ANTHROPIC_BASE_URL, so an ambient value from the
+   * developer's shell (or another tool) cannot redirect POC traffic.
+   * Unset: https://api.anthropic.com. Compose sets the gateway.
+   */
+  claudeBaseUrl: 'POC_CLAUDE_BASE_URL',
   pmMcpUrl: 'PM_MCP_URL',
   mocksUrl: 'MOCKS_URL',
   speechUrl: 'SPEECH_URL',
@@ -76,6 +82,12 @@ export const PATHS = {
     chat: '/api/chat',
     prepared: (taskId: string) => `/api/tasks/${encodeURIComponent(taskId)}/prepared`,
     prepare: (taskId: string) => `/api/tasks/${encodeURIComponent(taskId)}/prepare`,
+    /** GET `?path=<FileInfo.path>`: one client file from the fake file server, read only (FileView). */
+    file: (path: string) => `/api/files?path=${encodeURIComponent(path)}`,
+    files: '/api/files',
+    /** GET `?path=`: the file's own bytes (PDF inline), read only. */
+    fileRaw: (path: string) => `/api/files/raw?path=${encodeURIComponent(path)}`,
+    filesRaw: '/api/files/raw',
     hold: (taskId: string) => `/api/tasks/${encodeURIComponent(taskId)}/hold`,
     profiles: '/api/profiles',
     profile: (clientId: string) => `/api/profiles/${encodeURIComponent(clientId)}`,
@@ -98,6 +110,8 @@ export const PATHS = {
     messages: '/v1.0/me/messages',
     message: (id: string) => `/v1.0/me/messages/${encodeURIComponent(id)}`,
     sendMail: '/v1.0/me/sendMail',
+    /** The Sent Items folder (Graph well-known folder name `sentitems`). */
+    sentMessages: '/v1.0/me/mailFolders/sentitems/messages',
     calendarView: '/v1.0/me/calendarView',
     events: '/v1.0/me/events',
   },

@@ -31,9 +31,6 @@ export interface Gathered {
 
 const INBOX_CAP = 300;
 
-/** Optional sent-folder reader. MailReader has no such method today (see the report); used when present. */
-type MaybeSent = { listSent?: () => Promise<MailMessage[]> };
-
 export async function gather(ctx: ModuleContext, taskId: string): Promise<Gathered> {
   const { tasks } = await ctx.read.pm.listTasks({ includeDone: true });
   const task = tasks.find((t) => t.id === taskId);
@@ -126,8 +123,11 @@ export async function chaseTarget(ctx: ModuleContext, g: Gathered): Promise<{ to
   if (!to && g.client?.contacts[0]) to = { name: g.client.contacts[0].name, address: g.client.contacts[0].email };
   if (!to) throw new PrepareError('I could not work out who to chase: no contact is named and the client has no contacts.');
   const addr = to.address.toLowerCase();
-  const reader = ctx.read.mail as typeof ctx.read.mail & MaybeSent;
-  const sent = reader.listSent ? await reader.listSent().catch(() => []) : [];
+  // A Sent folder outage should not block the chaser; it is then written from the task and profile.
+  const sent = await ctx.read.mail.listSent().catch((err) => {
+    ctx.log(`sent folder unavailable: ${(err as Error).message}`);
+    return [] as MailMessage[];
+  });
   const lastSent =
     sent
       .filter((m) => m.toRecipients.some((r) => r.emailAddress.address.toLowerCase() === addr))
@@ -173,8 +173,16 @@ export function profileExcerpts(markdown: string | null): { label: string; text:
 
 /** Latest inbox messages from the client, newest first, excluding `exceptId`. */
 export function relatedMail(g: Gathered, exceptId: string | null, n = 3): MailMessage[] {
+  // The same email delivered twice (same sender, subject and text) is context once.
+  const seen = new Set<string>();
   return [...g.inbox]
     .reverse()
-    .filter((m) => m.id !== exceptId && fromClient(g.client, m))
+    .filter((m) => {
+      if (m.id === exceptId || !fromClient(g.client, m)) return false;
+      const key = `${m.from.emailAddress.address.toLowerCase()}\u0000${m.subject.trim()}\u0000${mailText(m).replace(/\s+/g, ' ')}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, n);
 }

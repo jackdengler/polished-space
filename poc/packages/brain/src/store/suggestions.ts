@@ -20,6 +20,7 @@ export class SuggestionStore {
   private items: Suggestion[] = [];
   private file: JsonFile<Suggestion[]>;
   private listeners: (() => void)[] = [];
+  private addListeners: ((made: Suggestion[]) => void)[] = [];
 
   constructor(path: string, private clock: Clock) {
     this.file = new JsonFile(path);
@@ -35,6 +36,11 @@ export class SuggestionStore {
 
   onChange(fn: () => void): void {
     this.listeners.push(fn);
+  }
+
+  /** Called after new suggestions are stored (any caller of add/addMany). */
+  onAdded(fn: (made: Suggestion[]) => void): void {
+    this.addListeners.push(fn);
   }
 
   private async persist(): Promise<void> {
@@ -60,6 +66,7 @@ export class SuggestionStore {
     const made = inputs.map((input) => Suggestion.parse({ ...input, id: `sug-${randomUUID()}`, status: 'pending', createdAt: now, decidedAt: null, error: null }));
     this.items.push(...made);
     await this.persist();
+    for (const l of this.addListeners) l(structuredClone(made));
     return structuredClone(made);
   }
 

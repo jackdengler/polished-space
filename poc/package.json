@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "description": "AI Work Assistant proof of concept. Sandbox only: invented data, no real systems.",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": [
     "packages/contracts",
     "packages/pm-server",
@@ -17,7 +19,17 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
-    "seed": "npm run seed -w @poc/seed --"
+    "seed": "npm run seed -w @poc/seed --",
+    "dev:up": "node scripts/dev.mjs up",
+    "dev:reset": "node scripts/dev.mjs reset",
+    "dev:down": "node scripts/dev.mjs down",
+    "up": "node scripts/compose.mjs up",
+    "reset": "node scripts/compose.mjs reset",
+    "down": "node scripts/compose.mjs down",
+    "check:isolation": "sh scripts/check-isolation.sh",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "e2e": "node e2e/demo.mjs",
+    "e2e:live": "POC_E2E_LIVE=1 node e2e/demo.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

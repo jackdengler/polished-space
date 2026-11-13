@@ -28,10 +28,10 @@ export function createPrioritiseModule(opts: PrioritiseOptions = {}): BrainModul
     onSuggestionApplied: schedule,
     onSuggestionDenied: schedule,
     onMessageTriaged: schedule,
+    onSuggestionsAdded: schedule,
     onTick: (now) => p?.tick(now),
     stop: () => p?.stop(),
     prioritiser: () => p,
   };
 }
 
-export const prioritiseModule: BrainModule = createPrioritiseModule();

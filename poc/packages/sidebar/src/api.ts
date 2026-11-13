@@ -1,6 +1,7 @@
 import {
   CHAT_SSE_EVENTS,
   DecisionResponse,
+  FileView,
   InputResponse,
   PATHS,
   PreparedResponse,
@@ -97,6 +98,11 @@ export const api = {
    */
   async prepare(taskId: string): Promise<void> {
     await post(PATHS.brain.prepare(taskId), {});
+  },
+
+  /** The client file behind a file review (text, or text taken from a PDF). */
+  async file(path: string): Promise<FileView> {
+    return checked(FileView, await request(PATHS.brain.file(path)), 'GET file');
   },
 
   async hold(taskId: string, onHold: boolean): Promise<TaskMeta> {

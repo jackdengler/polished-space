@@ -24,8 +24,12 @@ export interface BrainConfig {
   pmMcpUrl: string;
   mocksUrl: string;
   speechUrl: string;
-  /** Undefined means the SDK default (it reads ANTHROPIC_BASE_URL itself as well). */
-  anthropicBaseUrl: string | undefined;
+  /**
+   * Where Claude requests go: POC_CLAUDE_BASE_URL, else the public API.
+   * Always passed to the SDK explicitly, so an ambient ANTHROPIC_BASE_URL
+   * (from another tool in the same shell) can never redirect the brain.
+   */
+  anthropicBaseUrl: string;
   clock: Clock;
   maxUsdPerDay: number;
   /** Intake poll interval (plan: 2 to 3 seconds). */
@@ -37,6 +41,9 @@ export interface BrainConfig {
   /** Where mail and chat intake start when no cursor is stored yet. */
   intakeCursor: string;
 }
+
+/** The default Claude endpoint when POC_CLAUDE_BASE_URL is not set. */
+export const PUBLIC_CLAUDE_URL = 'https://api.anthropic.com';
 
 /** poc/data, resolved from this file (poc/packages/brain/src/config.ts). */
 export const LOCAL_DATA_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'data');
@@ -89,7 +96,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BrainConfig {
     pmMcpUrl: env[ENV.pmMcpUrl] || DEFAULT_URLS.pmMcp,
     mocksUrl: env[ENV.mocksUrl] || DEFAULT_URLS.mocks,
     speechUrl: env[ENV.speechUrl] || DEFAULT_URLS.speech,
-    anthropicBaseUrl: env[ENV.anthropicBaseUrl] || undefined,
+    anthropicBaseUrl: env[ENV.claudeBaseUrl] || PUBLIC_CLAUDE_URL,
     clock,
     maxUsdPerDay: num(env[ENV.maxUsdPerDay], 5),
     pollMs: num(env.POC_POLL_MS, 2500),

@@ -126,6 +126,13 @@ export interface ModuleContext {
      * Refuses to change id, kind or status. Not a write to any outside system.
      */
     revise(id: string, fn: (s: Suggestion) => Suggestion): Promise<Suggestion>;
+    /**
+     * Take a pending or failed suggestion off the list because a newer one
+     * replaces it (e.g. regenerated prepared work). It becomes `denied` with
+     * error "Replaced by a newer version." No action runs; nothing outside
+     * changes. Returns null if it was already decided another way.
+     */
+    retire(id: string, reason?: string): Promise<Suggestion | null>;
   };
   taskMeta: {
     get(taskId: string): TaskMeta | null;
@@ -161,6 +168,12 @@ export interface BrainModule {
   init?(ctx: ModuleContext): void | Promise<void>;
   /** A mail, chat, typed or spoken item was triaged and its suggestions stored. */
   onMessageTriaged?(e: MessageTriagedEvent): void | Promise<void>;
+  /**
+   * New pending suggestions were stored, from ANY source (intake, chat or
+   * voice `propose_*`, prepared work, next steps, calendar blocks). The same
+   * change notification for all of them, so e.g. Today's order never lags.
+   */
+  onSuggestionsAdded?(e: { suggestions: Suggestion[] }): void | Promise<void>;
   /** A suggestion was approved and its action succeeded. */
   onSuggestionApplied?(e: SuggestionAppliedEvent): void | Promise<void>;
   onSuggestionDenied?(e: SuggestionDecidedEvent): void | Promise<void>;

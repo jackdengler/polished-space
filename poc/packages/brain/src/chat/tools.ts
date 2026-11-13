@@ -346,7 +346,7 @@ async function proposeBlock(q: z.infer<typeof INPUTS.propose_calendar_block>, en
   const subject = q.subject ?? (q.purpose === 'lunch' ? 'Lunch' : task ? `Focus: ${task.title}` : 'Focus time');
   const s = await env.ctx.suggestions.add({
     kind: 'calendar_block',
-    title: `Block ${subject}`,
+    title: `Block time: ${subject}`,
     nudge: `You asked me to block ${q.purpose === 'lunch' ? 'lunch' : 'focus time'} on your calendar.`,
     clientId: task?.clientId ?? null,
     clientConfidence: 'high',

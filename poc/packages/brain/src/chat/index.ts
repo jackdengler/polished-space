@@ -128,4 +128,3 @@ export function createChatModule(opts: ChatModuleOptions = {}): ChatModule {
   };
 }
 
-export const chatModule: BrainModule = createChatModule();

@@ -473,7 +473,7 @@ export function SuggestionCard({ suggestion: s, showNudge = false }: { suggestio
         <span className="sg-kind">
           <Icon name={k.icon} size={13} /> {k.label}
         </span>
-        {s.kind !== 'confirm_client' ? <ClientTag name={clientName(s.clientId)} low={s.clientConfidence === 'low'} /> : null}
+        {s.kind === 'confirm_client' || (s.clientId === null && s.kind !== 'create_task') ? null : <ClientTag name={clientName(s.clientId)} low={s.clientConfidence === 'low'} />}
         <span className="sg-time">{ago(s.createdAt, now)}</span>
       </div>
       <h3 className="sg-title" id={headingId}>

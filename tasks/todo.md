@@ -826,10 +826,10 @@ Builders use `model: opus`, one focused piece each. **Phase 0 must finish first.
 
 ### Phase 3: Integration (one builder; depends on everything above)
 
-- [ ] **3.1 Wire the sidebar to the real brain;** remove the fixture server from the runtime path. *Check:* the sidebar e2e passes against the real brain with `FakeClaude`.
+- [x] **3.1 Wire the sidebar to the real brain;** remove the fixture server from the runtime path. *Check:* the sidebar e2e passes against the real brain with `FakeClaude`.
 - [ ] **3.2 Compose up end to end,** with `npm run poc:up`, `poc:reset`, `poc:down` and `poc/README.md`. *Check:* all health endpoints are green.
 - [ ] **3.3 Isolation checks.** *Check:* from inside `brain`, `pm`, `mocks` and `speech`, a request to an outside host fails; from `brain`, a request through the gateway to Claude succeeds; the gateway refuses any other upstream; host ports listen on 127.0.0.1 only.
-- [ ] **3.4 Secret checks.** *Check:* grep of the repo and built images finds no `sk-ant-`; `poc/.env` is ignored by git; logs do not print the key.
+- [x] **3.4 Secret checks.** *Check:* grep of the repo and built images finds no `sk-ant-`; `poc/.env` is ignored by git; logs do not print the key.
 - [ ] **3.5 `poc/e2e/demo.mjs`:** the 11-step check in section 8, with live Claude. *Check:* passes three runs in a row.
 - [ ] **3.6 Live prompt tuning** on the seed messages: correct client, both task directions, duplicates caught, cache hits seen, voice timings logged.
 

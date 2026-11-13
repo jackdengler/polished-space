@@ -28,6 +28,12 @@ export class GraphMailConnector implements MailConnector {
     return { items: picked, cursor: picked.length ? picked[picked.length - 1]!.receivedDateTime : cursor };
   }
 
+  async listSent(): Promise<MailMessage[]> {
+    const q = new URLSearchParams({ $orderby: 'sentDateTime asc', $top: '200' });
+    const list = GraphMessageList.parse(await httpJson(`${joinUrl(this.baseUrl, PATHS.graph.sentMessages)}?${q}`));
+    return [...list.value].sort((a, b) => (a.sentDateTime ?? a.receivedDateTime).localeCompare(b.sentDateTime ?? b.receivedDateTime));
+  }
+
   async get(id: string): Promise<MailMessage> {
     return GraphMessage.parse(await httpJson(joinUrl(this.baseUrl, PATHS.graph.message(id))));
   }

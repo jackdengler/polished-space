@@ -160,6 +160,14 @@ export class PrepareService {
         if (now && (now.status === 'applied' || now.status === 'approved')) return now.id;
       }
     }
+    // A failed (or other-kind pending) old card would linger next to the new one: retire it.
+    if (old && (old.status === 'failed' || old.status === 'pending')) {
+      const retired = await this.ctx.suggestions.retire(old.id);
+      if (!retired) {
+        const now = this.ctx.suggestions.get(old.id);
+        if (now && (now.status === 'applied' || now.status === 'approved')) return now.id;
+      }
+    }
     return (await this.ctx.suggestions.add(input)).id;
   }
 

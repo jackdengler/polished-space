@@ -72,6 +72,10 @@ export function createApp(opts: AppOptions): Handler {
       const items = listMessages(store.read('mail'), url.searchParams);
       return json(200, { value: items });
     }),
+    get(PATHS.graph.sentMessages, () => {
+      const value = [...store.read('sent')].sort((a, b) => (a.sentDateTime ?? a.receivedDateTime).localeCompare(b.sentDateTime ?? b.receivedDateTime));
+      return json(200, { value });
+    }),
     get(/^\/v1\.0\/me\/messages\/([^/]+)$/, (_req, _url, [id]) => {
       const found = [...store.read('mail'), ...store.read('sent')].find((m) => m.id === id);
       if (!found) throw new HttpError(404, `message not found: ${id}`);

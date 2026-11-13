@@ -39,21 +39,28 @@ export interface AnthropicLike {
 
 /**
  * Builds the real SDK client. The key comes only from the environment
- * (ANTHROPIC_API_KEY, read by the SDK); it is never passed, stored or logged
- * here. Returns null when no credentials are configured, so the brain still
- * starts and every call fails with a clear ClaudeUnavailableError.
+ * (ANTHROPIC_API_KEY); it is never stored or logged here. The base URL is
+ * always passed explicitly (config.anthropicBaseUrl = POC_CLAUDE_BASE_URL or
+ * the public API), and `authToken: null` stops the SDK from picking up an
+ * ambient ANTHROPIC_AUTH_TOKEN, so nothing from the surrounding shell can
+ * redirect POC traffic or attach someone else's credentials. Returns null
+ * when no key is configured, so the brain still starts and every call fails
+ * with a clear ClaudeUnavailableError.
  */
 export function createAnthropicClient(config: Pick<BrainConfig, 'anthropicBaseUrl'>, env: NodeJS.ProcessEnv = process.env): AnthropicLike | null {
-  // The SDK constructs fine without credentials and only fails per request, so check up front.
-  if (!env.ANTHROPIC_API_KEY && !env.ANTHROPIC_AUTH_TOKEN && !env.ANTHROPIC_PROFILE) return null;
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
   try {
-    return new Anthropic(config.anthropicBaseUrl ? { baseURL: config.anthropicBaseUrl } : {}) as unknown as AnthropicLike;
+    return new Anthropic({ apiKey, authToken: null, baseURL: config.anthropicBaseUrl }) as unknown as AnthropicLike;
   } catch {
     return null;
   }
 }
 
-// ---- errors ----------------------------------------------------------------
+/** The base URL a client really sends to (tests). */
+export function clientBaseUrl(client: AnthropicLike | null): string | null {
+  return (client as unknown as { baseURL?: string } | null)?.baseURL ?? null;
+}
 
 export class ClaudeError extends Error {
   override name = 'ClaudeError';

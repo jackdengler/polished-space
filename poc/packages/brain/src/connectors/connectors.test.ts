@@ -72,6 +72,7 @@ describe('GraphMailConnector', () => {
         return json(res, 200, { value: page ? items.slice(1) : items });
       }
       if (req.method === 'GET' && url.pathname === PATHS.graph.message('m2')) return json(res, 200, all[1]);
+      if (req.method === 'GET' && url.pathname === PATHS.graph.sentMessages) return json(res, 200, { value: [{ ...mail('s2', '2026-11-12T09:00:00Z'), sentDateTime: '2026-11-12T09:00:00Z' }, { ...mail('s1', '2026-11-11T09:00:00Z'), sentDateTime: '2026-11-11T09:00:00Z' }] });
       if (req.method === 'POST' && url.pathname === PATHS.graph.sendMail) {
         sent.push(GraphSendMailRequest.parse(JSON.parse(body)));
         res.writeHead(202);
@@ -87,6 +88,7 @@ describe('GraphMailConnector', () => {
     expect((await c.listSince(first.cursor)).items).toEqual([]);
     expect((await c.listSince('')).items).toHaveLength(3);
     expect((await c.get('m2')).id).toBe('m2');
+    expect((await c.listSent()).map((m) => m.id)).toEqual(['s1', 's2']);
     const out = await c.send({ to: [{ name: 'Michael Okafor', address: 'michael.okafor@acmetooling.example' }], cc: [], subject: 'Re: x', body: 'Hello', replyToMessageId: 'm2' });
     expect(out.id).toMatch(/^sent-/);
     expect(sent).toEqual([{ message: { subject: 'Re: x', body: { contentType: 'text', content: 'Hello' }, toRecipients: [{ emailAddress: { name: 'Michael Okafor', address: 'michael.okafor@acmetooling.example' } }], ccRecipients: [] }, saveToSentItems: true }]);

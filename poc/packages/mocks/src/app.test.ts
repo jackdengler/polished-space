@@ -262,6 +262,18 @@ describe('fake Graph mail', () => {
     expect(onDisk.map((m) => m.id)).toEqual([id]);
   });
 
+  it('the Sent Items folder lists what sendMail filed, oldest first (Graph mailFolders/sentitems/messages)', async () => {
+    for (const subject of ['First chaser', 'Second chaser']) {
+      const r = await postJson(PATHS.graph.sendMail, draftToSendMail({ to: [MICHAEL], cc: [], subject, body: `Body of ${subject}`, replyToMessageId: null }));
+      expect(r.status).toBe(202);
+    }
+    const list = GraphMessageList.parse((await getJson(PATHS.graph.sentMessages)).body);
+    expect(list.value.map((m) => m.subject)).toEqual(['First chaser', 'Second chaser']);
+    expect(list.value[0]!.toRecipients).toEqual([{ emailAddress: MICHAEL }]);
+    // The inbox listing is unchanged.
+    expect(GraphMessageList.parse((await getJson(PATHS.graph.messages)).body).value.some((m) => m.subject === 'First chaser')).toBe(false);
+  });
+
   it('sendMail with an invalid body is a 400 and stores nothing', async () => {
     const r = await postJson(PATHS.graph.sendMail, { message: { subject: 'x', body: { contentType: 'text', content: 'y' }, toRecipients: [] } });
     expect(r.status).toBe(400);

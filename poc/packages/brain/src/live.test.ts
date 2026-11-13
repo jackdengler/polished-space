@@ -22,7 +22,7 @@ import { ZoomChatConnector } from './connectors/chat';
 import { LocalFilesConnector } from './connectors/files';
 import { GraphMailConnector } from './connectors/mail';
 import { McpPmConnector } from './connectors/pm';
-import { MODULES } from './modules';
+import { createModules } from './modules';
 
 const live = process.env.BRAIN_LIVE_TEST === '1';
 
@@ -36,7 +36,7 @@ describe.skipIf(!live)('live: real pm-server and mocks, FakeClaude', () => {
       config,
       anthropic: claude as unknown as AnthropicLike,
       connectors: { pm, mail, calendar: new GraphCalendarConnector(config.mocksUrl), chat: new ZoomChatConnector(config.mocksUrl), files: new LocalFilesConnector(join(config.dataDir, DATA_LAYOUT.files)) },
-      modules: MODULES,
+      modules: createModules(),
       log: () => {},
     });
     await brain.init();

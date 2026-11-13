@@ -281,6 +281,26 @@ describe('follow_up', () => {
   });
 });
 
+describe('follow_up quotes the unanswered sent email (Sent folder read)', () => {
+  it('finds the last email sent to the quiet contact, puts it in the prompt and replies to it', async () => {
+    const { h, mod, settle } = await setup();
+    h.mail.seedSent({ to: [MICHAEL], cc: [], subject: 'Job matches for sign-off', body: 'Hi Michael,\n\nAttached are the 18 job matches. Could you sign them off by Wednesday?\n\nAlex', replyToMessageId: null }, '2026-11-09T10:00:00.000Z');
+    h.mail.seedSent({ to: [DMITRI], cc: [], subject: 'Unrelated', body: 'Not for Michael.', replyToMessageId: null }, '2026-11-10T10:00:00.000Z');
+    h.claude.enqueue({ parsed: { subject: 'ignored', body: 'Hi Michael,\n\nA quick nudge on the job matches.\n\nAlex', nextStep: none } });
+    const taskId = await approveTask(h, settle, { title: 'Chase Michael on the job match sign-off', clientId: 'poc-client-acme', taskType: 'follow_up', source: { connector: 'manual', id: 'manual-1', label: 'Typed: "chase Michael"' } });
+    const prompt = userText(h.claude.calls.at(-1)!);
+    expect(prompt).toContain('Job matches for sign-off');
+    expect(prompt).toContain('sign them off by Wednesday');
+    expect(prompt).toContain('They have not answered the email');
+    expect(prompt).not.toContain('Not for Michael.');
+    const r = prepared(mod, taskId);
+    if (r.prepared?.type !== 'follow_up') throw new Error('type');
+    expect(r.prepared.draft.subject).toBe('Re: Job matches for sign-off');
+    expect(r.prepared.draft.to).toEqual([MICHAEL]);
+    expect(writes(h, 'sendMail')).toHaveLength(0);
+  });
+});
+
 describe('other', () => {
   it('gathers context with source refs', async () => {
     const { h, mod, settle } = await setup();
@@ -360,6 +380,33 @@ describe('routes, regenerate, failure', () => {
     expect(r.body.status).toBe('ready');
     expect(r.body.error).toBeNull();
     expect(h.writes.every((w) => w.approval !== null)).toBe(true);
+  });
+
+  it('regenerating after the prepared action FAILED retires the failed card (no lingering duplicate)', async () => {
+    const mod = createPrepareModule();
+    const h = await makeHarness({ modules: [mod], fail: { sendMail: new Error('mail server down') } });
+    running.push(h);
+    const settle = async () => {
+      await h.brain.idle();
+      await mod.idle();
+      await h.brain.idle();
+    };
+    const mail = h.mail.deliver({ from: MICHAEL, subject: 'Pricing', body: 'Update please.' });
+    h.claude.enqueue({ parsed: { subject: 's', body: 'First.', nextStep: none } }, { parsed: { subject: 's', body: 'Second.', nextStep: none } });
+    const taskId = await approveTask(h, settle, { title: 'Reply to Michael', clientId: 'poc-client-acme', taskType: 'reply_email', source: mailSource(mail) });
+    const first = prepared(mod, taskId).suggestion!;
+    const failed = await h.brain.approve(first.id);
+    expect(failed.status).toBe('failed');
+    expect((await h.brain.buildState()).suggestions.map((s) => s.id)).toContain(first.id);
+
+    mod.service()!.startPrepare(taskId);
+    await settle();
+    const after = prepared(mod, taskId);
+    expect(after.suggestion!.id).not.toBe(first.id);
+    expect(after.suggestion!.status).toBe('pending');
+    expect(h.brain.suggestions.get(first.id)).toMatchObject({ status: 'denied', error: 'Replaced by a newer version.' });
+    const shown = (await h.brain.buildState()).suggestions.filter((s) => s.kind === 'send_reply');
+    expect(shown.map((s) => s.id)).toEqual([after.suggestion!.id]);
   });
 
   it('opening a task that was never prepared starts preparing it', async () => {

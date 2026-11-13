@@ -14,7 +14,7 @@ import { ZoomChatConnector } from './connectors/chat';
 import { LocalFilesConnector } from './connectors/files';
 import { GraphMailConnector } from './connectors/mail';
 import { McpPmConnector } from './connectors/pm';
-import { MODULES } from './modules';
+import { createModules } from './modules';
 
 const config = loadConfig();
 const pm = new McpPmConnector(config.pmMcpUrl);
@@ -29,7 +29,7 @@ const brain = new Brain({
     chat: new ZoomChatConnector(config.mocksUrl),
     files: new LocalFilesConnector(join(config.dataDir, DATA_LAYOUT.files)),
   },
-  modules: MODULES,
+  modules: createModules(),
 });
 
 await brain.init();

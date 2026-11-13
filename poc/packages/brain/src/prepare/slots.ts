@@ -2,11 +2,14 @@
  * Meeting slot finder: pure code over the calendar, so proposed times can
  * never overlap an event (Claude only picks among these and words the reply).
  *
- * Note for the lead: MODULES.md names no shared `findMeetingSlots`, and the
- * calendar code in `prioritise/` was still in progress, so this small finder
- * lives here. It can be swapped for a shared one later.
+ * What counts as busy comes from the one shared rule in
+ * `prioritise/calendar/gaps.ts` (`busySpans`), so the "free hour" nudge and
+ * the meeting slots can never disagree about which events block time. The
+ * stepping (30-minute starts, two-hour spread, lead time) is specific to
+ * meeting proposals and stays here.
  */
-import { addDaysIso, eventSpanMs, localDate, weekdayIndex, zonedTime, type CalEvent, type TimeSlot } from '@poc/contracts';
+import { addDaysIso, localDate, weekdayIndex, zonedTime, type CalEvent, type TimeSlot } from '@poc/contracts';
+import { busySpans } from '../prioritise/calendar/gaps';
 
 export interface SlotOptions {
   now: Date;
@@ -30,11 +33,6 @@ export interface SlotOptions {
   max?: number;
 }
 
-/** Events that block time: anything not shown as free or working elsewhere. */
-export function blocksTime(e: CalEvent): boolean {
-  return e.showAs !== 'free' && e.showAs !== 'workingElsewhere';
-}
-
 /** Candidate meeting slots, earliest first, none overlapping a busy event. */
 export function findMeetingSlots(events: CalEvent[], o: SlotOptions): TimeSlot[] {
   const dur = o.durationMin * 60_000;
@@ -43,7 +41,7 @@ export function findMeetingSlots(events: CalEvent[], o: SlotOptions): TimeSlot[]
   const perDay = o.perDay ?? 3;
   const max = o.max ?? 15;
   const earliest = o.now.getTime() + (o.leadMin ?? 120) * 60_000;
-  const busy = events.filter(blocksTime).map(eventSpanMs);
+  const busy = busySpans(events);
   const out: TimeSlot[] = [];
   let date = localDate(o.now, o.tz);
   let workingDays = 0;

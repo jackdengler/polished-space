@@ -53,6 +53,18 @@ describe('profiles module', () => {
     expect(md2).toContain('- Lena Hartwell: added by hand, keep me');
   });
 
+  it('approving a task that triage already noted updates that line instead of adding a twin', async () => {
+    const { h, read } = await setup();
+    h.claude.enqueue({ parsed: triage({ profileEdits: [{ section: 'Commitments: we owe', op: 'add', text: 'Reply to Michael with a pricing update' }] }) });
+    h.mail.deliver(michaelMail);
+    await h.brain.tick();
+    await h.brain.idle();
+    const reply = pending(h).find((s) => s.kind === 'create_task' && s.taskType === 'reply_email')!;
+    await h.brain.approve(reply.id);
+    await h.brain.idle();
+    expect(sectionBullets(await read('acme-tooling-co'), 'Commitments: we owe')).toEqual(['Reply to Michael with a pricing update (due 2026-11-16)']);
+  });
+
   it('ignores edits for a low-confidence or Internal match', async () => {
     const { h, read } = await setup();
     const before = await read('acme-tooling-co');
