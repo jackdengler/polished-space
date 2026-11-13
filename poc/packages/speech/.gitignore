@@ -1,0 +1,2 @@
+# Speech models are downloaded (npm run models / Dockerfile), never committed.
+/models/

@@ -4,10 +4,30 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "node -e \"console.log('@poc/speech: placeholder, not built yet'); setInterval(() => {}, 1 << 30)\"",
+    "start": "tsx src/main.ts",
+    "start:fake": "SPEECH_ENGINE=fake tsx src/main.ts",
+    "models": "tsx scripts/download-models.ts",
+    "fixture": "tsx scripts/make-fixture.ts",
+    "measure": "tsx scripts/measure.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@poc/contracts": "*"
+    "@poc/contracts": "*",
+    "sherpa-onnx-node": "1.13.8",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
+  },
+  "description": "Local streaming speech-to-text (WS /stt) and text-to-speech (POST /tts) on sherpa-onnx. Models are downloaded, never committed.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
+  },
+  "optionalDependencies": {
+    "sherpa-onnx-linux-x64": "1.13.8",
+    "sherpa-onnx-linux-arm64": "1.13.8",
+    "sherpa-onnx-darwin-arm64": "1.13.8",
+    "sherpa-onnx-darwin-x64": "1.13.8"
   }
 }

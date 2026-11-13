@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "node -e \"console.log('@poc/brain: placeholder, not built yet'); setInterval(() => {}, 1 << 30)\"",
+    "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@poc/contracts": "*"
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@poc/contracts": "*",
+    "zod": "^4.6.7"
   }
 }

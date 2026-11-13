@@ -1,0 +1,105 @@
+/* ---------- Design tokens (copied from Planr src/styles.css so the sidebar is a sibling) ---------- */
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #f7f7f8;
+  --bg-sidebar: #fafafa;
+  --bg-hover: #f1f1f3;
+  --bg-column: #f6f6f8;
+  --card: #ffffff;
+  --border: #e7e7ea;
+  --border-strong: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #55555f;
+  --text-faint: #6f6f79; /* ≥4.5:1 on the light surfaces */
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef2ff;
+  --accent-text: #ffffff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --success: #16a34a;
+  --gold: #8a5a12;
+  --gold-soft: #fdf6e3;
+  --gold-border: #e6b84f;
+  --logo-blend: multiply; /* lets logos with white backgrounds blend into light surfaces */
+  --scroll: #cfcfd6;
+  --scroll-hover: #a9a9b3;
+  /* spacing scale (4px grid) */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --shadow-sm: 0 1px 2px rgba(16, 16, 24, 0.06);
+  --shadow: 0 1px 2px rgba(16, 16, 24, 0.06), 0 4px 12px rgba(16, 16, 24, 0.06);
+  --shadow-lg: 0 10px 30px rgba(16, 16, 24, 0.14), 0 2px 6px rgba(16, 16, 24, 0.06);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111114;
+    --bg-subtle: #18181c;
+    --bg-sidebar: #141417;
+    --bg-hover: #222228;
+    --bg-column: #18181c;
+    --card: #1e1e23;
+    --border: #2a2a31;
+    --border-strong: #3a3a43;
+    --text: #ececef;
+    --text-muted: #a3a3b0;
+    --text-faint: #8b8b97;
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-soft: #24244a;
+    --accent-text: #0b0b1a;
+    --danger: #f87171;
+    --danger-soft: #3a1717;
+    --warn: #fbbf24;
+    --warn-soft: #33270b;
+    --success: #4ade80;
+    --gold: #f2c35b;
+    --gold-soft: #3a2f12;
+    --gold-border: #a8822c;
+    --logo-blend: normal;
+    --scroll: #34343c;
+    --scroll-hover: #4a4a55;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+    --bg: #111114;
+    --bg-subtle: #18181c;
+    --bg-sidebar: #141417;
+    --bg-hover: #222228;
+    --bg-column: #18181c;
+    --card: #1e1e23;
+    --border: #2a2a31;
+    --border-strong: #3a3a43;
+    --text: #ececef;
+    --text-muted: #a3a3b0;
+    --text-faint: #8b8b97;
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-soft: #24244a;
+    --accent-text: #0b0b1a;
+    --danger: #f87171;
+    --danger-soft: #3a1717;
+    --warn: #fbbf24;
+    --warn-soft: #33270b;
+    --success: #4ade80;
+    --gold: #f2c35b;
+    --gold-soft: #3a2f12;
+    --gold-border: #a8822c;
+    --logo-blend: normal;
+    --scroll: #34343c;
+    --scroll-hover: #4a4a55;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
