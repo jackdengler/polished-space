@@ -188,7 +188,8 @@ await post('/__fixture/reset');
     expect(sent.length === 1 && sent[0].to[0].address === 'dmitri.vance@harborlight.example', 'mail not sent');
     const log = await api('/__fixture/log');
     const a = log.find((l) => l.action === 'approve' && l.id === 'sg-prep-harbor-meet');
-    expect(a?.body?.edits?.payload?.draft?.body?.split('\n- ').length > 3, 'edited draft not sent');
+    const body = a?.body?.edits?.payload?.draft?.body ?? '';
+    expect(body.split('\n- ').length === 4 && sent[0].body === body, `edited draft not sent: ${JSON.stringify(body)}`);
     await back(page);
   });
 

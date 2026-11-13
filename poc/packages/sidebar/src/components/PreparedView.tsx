@@ -105,7 +105,8 @@ export function PreparedView({ taskId }: { taskId: string }) {
   const today = useUi((s) => s.state?.today ?? '');
   const open = useUi((s) => s.open);
   const offline = useUi((s) => s.connection === 'lost');
-  const nextSteps = useUi((s) => s.state?.suggestions.filter((x) => x.source?.connector === 'next_step' && x.source.id === taskId && x.status === 'pending') ?? []);
+  const allSuggestions = useUi((s) => s.state?.suggestions);
+  const nextSteps = (allSuggestions ?? []).filter((x) => x.source?.connector === 'next_step' && x.source.id === taskId && x.status === 'pending');
   const tasks = useAllTasks();
   const [data, setData] = useState<PreparedResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

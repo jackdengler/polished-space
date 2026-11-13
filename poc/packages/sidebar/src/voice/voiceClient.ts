@@ -140,7 +140,7 @@ export async function openBrowserAudio(): Promise<{ mic: MicCapture; sink: Playb
   };
   captureNode.port.onmessage = (e: MessageEvent<ArrayBuffer>) => mic.onFrame?.(e.data);
 
-  const resampler = new Resampler(24000, ctx.sampleRate);
+  const resampler = new Resampler(22050, ctx.sampleRate);
   const sink: PlaybackSink = {
     onState: null,
     setInputRate: (rate) => {

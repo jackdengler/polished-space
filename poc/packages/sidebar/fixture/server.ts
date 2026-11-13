@@ -203,7 +203,7 @@ async function handleFixture(req: IncomingMessage, res: ServerResponse, url: URL
 // ---- WS /api/voice --------------------------------------------------------
 
 const FRAME_BYTES = (AUDIO.sttSampleRate * AUDIO.sttFrameMs * 2) / 1000; // 640
-const TTS_RATE = 24000;
+const TTS_RATE = 22050; // what the speech service announces (PCM16 mono)
 
 /** A scripted voice session: partials as frames arrive, a final, then a streamed spoken reply. */
 class VoiceSession {

@@ -129,8 +129,10 @@ function Field({ label, children, hint }: { label: string; children: (id: string
   );
 }
 
+const NO_CLIENTS: { id: string; name: string }[] = [];
+
 function ClientSelect({ id, value, onChange, only }: { id: string; value: string; onChange: (v: string) => void; only?: string[] }) {
-  const clients = useUi((s) => s.state?.clients ?? []);
+  const clients = useUi((s) => s.state?.clients) ?? NO_CLIENTS;
   const list = only && only.length ? clients.filter((c) => only.includes(c.id)) : clients;
   const extra = only && only.length ? clients.filter((c) => !only.includes(c.id)) : [];
   return (
@@ -180,6 +182,7 @@ function EditFields({
   firstRef: React.RefObject<HTMLElement | null>;
 }) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const caret = useRef<number | null>(null);
   const ref = (el: HTMLElement | null) => {
     firstRef.current = el;
   };
@@ -234,7 +237,16 @@ function EditFields({
     case 'send_reply': {
       const insert = (text: string) => {
         const el = bodyRef.current;
-        const at = el ? el.selectionStart : form.body.length;
+        // At the caret if the user has been in the message; otherwise after the last listed time (or at the end).
+        let at = form.body.length;
+        if (el && document.activeElement === el) at = el.selectionStart;
+        else if (caret.current !== null) at = Math.min(caret.current, form.body.length);
+        else {
+          const lines = [...form.body.matchAll(/^- .*$/gm)];
+          const last = lines[lines.length - 1];
+          if (last?.index !== undefined) at = last.index + last[0].length + 1;
+        }
+        caret.current = at + text.length + 1;
         const before = form.body.slice(0, at);
         const after = form.body.slice(at);
         const sep = before && !before.endsWith('\n') ? '\n' : '';
@@ -266,6 +278,7 @@ function EditFields({
                 rows={Math.min(14, Math.max(6, form.body.split('\n').length + 1))}
                 value={form.body}
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
+                onBlur={(e) => (caret.current = e.currentTarget.selectionStart)}
               />
             )}
           </Field>
