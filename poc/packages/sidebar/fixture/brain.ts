@@ -413,7 +413,7 @@ export class FixtureBrain {
     if (/add (a )?task|chase|remind me/.test(lower)) {
       const s = this.intake(text, 'manual');
       const when = s.payload.dueDate ? ' for Friday' : '';
-      const who = s.clientId ? ` and tagged it ${clientName(s.clientId)}` : '';
+      const who = s.clientId ? ` and tagged it ${clientName(s.clientId).replace(/\.$/, '')}` : '';
       return { words: `Done. I’ve drafted that task${when}${who}. Approve it below and it goes into Planr.`.split(/(?<= )/), suggestion: s };
     }
     if (/tell me more/.test(lower)) {

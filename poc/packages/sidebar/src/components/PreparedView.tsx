@@ -8,7 +8,7 @@ import { ClientTag, SourceChip, SuggestionActions, SuggestionCard, SuggestionDet
 
 const TITLES: Record<PreparedWork['type'], string> = {
   reply_email: 'Drafted reply',
-  schedule_meeting: 'Times that work, and a drafted reply',
+  schedule_meeting: 'Suggested times and reply',
   review_file: 'File review',
   follow_up: 'Drafted chaser',
   other: 'What I gathered',
@@ -47,6 +47,7 @@ function Work({ prepared, suggestion, tasks, editing }: { prepared: PreparedWork
     case 'schedule_meeting':
       return (
         <>
+          {editing ? null : (
           <ul className="slots" aria-label="Suggested times">
             {prepared.slots.map((s) => (
               <li key={s.start} className="slot">
@@ -54,6 +55,7 @@ function Work({ prepared, suggestion, tasks, editing }: { prepared: PreparedWork
               </li>
             ))}
           </ul>
+          )}
           {editing ? null : <h3 className="pw-sub">Reply</h3>}
           {draftBlock(prepared.draft)}
         </>

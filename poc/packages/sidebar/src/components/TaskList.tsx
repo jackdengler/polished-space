@@ -138,7 +138,7 @@ function AddTask() {
       <label className="sr-only" htmlFor="add-task-input">
         Add a task
       </label>
-      <input id="add-task-input" className="text-input" placeholder="Add a task, e.g. “chase Lena for the census on Friday”" value={text} onChange={(e) => setText(e.target.value)} disabled={busy} />
+      <input id="add-task-input" className="text-input" placeholder="Add a task, e.g. “chase Lena Friday”" value={text} onChange={(e) => setText(e.target.value)} disabled={busy} />
       <button type="submit" className="btn btn-sm" disabled={busy || !text.trim()}>
         {busy ? 'Adding…' : 'Add'}
       </button>

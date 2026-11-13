@@ -39,6 +39,9 @@ function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: S
             ) : null}
           </div>
         </div>
+        <button type="button" className="icon-btn nudge-dismiss" aria-label="Dismiss nudge" title="Dismiss" onClick={() => dismiss(nudge.id)}>
+          <Icon name="x" size={14} />
+        </button>
       </div>
       <div className="nudge-actions">
         {n > 0 ? (
@@ -54,9 +57,6 @@ function NudgeCard({ nudge, suggestions, total }: { nudge: Nudge; suggestions: S
         ) : null}
         <button type="button" className="btn btn-sm btn-ghost" disabled={chatBusy} onClick={() => void sendChat(`Tell me more about this: ${nudge.text}`)}>
           <Icon name="chat" size={13} /> Ask about it
-        </button>
-        <button type="button" className="icon-btn nudge-dismiss" aria-label="Dismiss nudge" title="Dismiss" onClick={() => dismiss(nudge.id)}>
-          <Icon name="x" size={14} />
         </button>
       </div>
       {n > 0 && expanded ? (

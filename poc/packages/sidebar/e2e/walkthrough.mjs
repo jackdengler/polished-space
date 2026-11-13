@@ -103,6 +103,13 @@ await post('/__fixture/reset');
     expect(JSON.stringify(today) === JSON.stringify(sentToday), 'today order differs');
   });
   await shot(page, 'light-main-list');
+  await scrollTo(page, '[data-section="inbox"]');
+  await shot(page, 'light-main-list-inbox');
+  await scrollTo(page, '[data-section="overdue"]');
+  await shot(page, 'light-main-list-today');
+  await page.locator('.main-scroll').evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await shot(page, 'light-main-list-bottom');
+  await scrollMainTop(page);
 
   await step('nudge → review → approve → task lands in Today and the list reorders', async () => {
     await page.locator('[data-nudge-id="n-acme"]').getByRole('button', { name: /Review 3 suggestions/ }).click();
@@ -295,7 +302,16 @@ for (const scheme of ['dark']) {
   const { context, page } = await newPage(scheme);
   await page.goto(BASE + '/');
   await page.locator('.section').first().waitFor();
-  await step(`${scheme}: main list`, async () => shot(page, `${scheme}-main-list`));
+  await step(`${scheme}: main list`, async () => {
+    await shot(page, `${scheme}-main-list`);
+    await scrollTo(page, '[data-section="inbox"]');
+    await shot(page, `${scheme}-main-list-inbox`);
+    await scrollTo(page, '[data-section="overdue"]');
+    await shot(page, `${scheme}-main-list-today`);
+    await page.locator('.main-scroll').evaluate((el) => (el.scrollTop = el.scrollHeight));
+    await shot(page, `${scheme}-main-list-bottom`);
+    await scrollMainTop(page);
+  });
   await step(`${scheme}: suggestion card in edit mode`, async () => {
     await page.locator('[data-nudge-id="n-acme"]').getByRole('button', { name: /Review 3 suggestions/ }).click();
     const card = page.locator('[data-suggestion-id="sg-acme-meet"]');

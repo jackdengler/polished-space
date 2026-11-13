@@ -8,5 +8,6 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}', 'fixture/**/*.test.ts'],
     setupFiles: ['src/test/setup.ts'],
+    env: { TZ: 'UTC' },
   },
 });
