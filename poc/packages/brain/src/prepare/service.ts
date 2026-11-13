@@ -124,7 +124,7 @@ export class PrepareService {
       this.errors.set(taskId, message);
       this.ctx.log(`prepare ${taskId} failed: ${message}`);
       await this.ctx.taskMeta.upsert(taskId, { preparedStatus: 'failed' });
-      const title = this.ctx.taskMeta.get(taskId) ? (await this.taskTitle(taskId)) : taskId;
+      const title = await this.taskTitle(taskId);
       this.ctx.nudges.add({ kind: 'info', text: `I couldn't prepare "${title}": ${message} You can try again from the task.`, source: null, taskId });
     }
   }

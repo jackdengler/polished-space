@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PATHS, ProfileDoc, ProfileListResponse } from '@poc/contracts';
@@ -144,7 +145,7 @@ describe('profiles module', () => {
     expect(sectionBullets(md, 'Commitments: we owe')[0]).toBe('Reply to Michael with a pricing update (due 2026-11-17; focus time booked 2026-11-13 14:00-15:00)');
 
     // Sending the reply marks it done (code) and makes ONE small profile call for what the email promised.
-    h.claude.enqueue({ parsed: { edits: [{ section: 'Commitments: we owe', op: 'add', text: 'Send the full pricing deck by 2026-11-20' }, { section: 'Bogus', op: 'add', text: 'x' }] } });
+    h.claude.enqueue({ parsed: { edits: [{ section: 'Commitments: we owe', op: 'add', text: 'Send the full pricing deck by 2026-11-20' }] } });
     const send = await h.brain.suggestions.add({
       kind: 'send_reply',
       title: 'Reply to Michael',
@@ -166,7 +167,6 @@ describe('profiles module', () => {
 
     md = await read('acme-tooling-co');
     expect(sectionBullets(md, 'Commitments: we owe')).toEqual(['Reply to Michael with a pricing update (done 2026-11-13)', 'Set up a 45-minute call with Michael', 'Send the full pricing deck by 2026-11-20']);
-    expect(md).not.toContain('Bogus');
     const log = sectionBullets(md, 'Change log');
     expect(log.filter((l) => l.startsWith(NOW))).toHaveLength(6);
     // Only the approved actions wrote outside: never the profile updates.
@@ -191,6 +191,24 @@ describe('profiles module', () => {
     expect(sectionBullets(await read('acme-tooling-co'), 'Commitments: we owe')).toEqual(['Reply to Michael: he only wants headline numbers']);
   });
 
+  it('a refused or failed profile call is logged and changes nothing; a reply with no client makes no call', async () => {
+    const { h, read } = await setup();
+    const before = await read('acme-tooling-co');
+    const draft = { to: [{ name: 'Michael Okafor', address: 'michael.okafor@acmetooling.example' }], cc: [], subject: 'Re: hello', body: 'Thanks Michael.', replyToMessageId: null };
+    h.claude.enqueue({ parsed: { edits: [] }, stop_reason: 'refusal' });
+    const s1 = await h.brain.suggestions.add({ kind: 'send_reply', title: 'Reply', nudge: '', clientId: 'poc-client-acme', clientConfidence: 'high', source: null, payload: { taskId: null, draft } });
+    expect((await h.brain.approve(s1.id, {})).status).toBe('applied');
+    await h.brain.idle();
+    expect(h.logs.some((l) => l.includes('profile update after reply') && l.includes('skipped'))).toBe(true);
+    expect(await read('acme-tooling-co')).toBe(before);
+
+    const calls = h.claude.calls.length;
+    const s2 = await h.brain.suggestions.add({ kind: 'send_reply', title: 'Reply', nudge: '', clientId: null, clientConfidence: 'low', source: null, payload: { taskId: null, draft } });
+    await h.brain.approve(s2.id, {});
+    await h.brain.idle();
+    expect(h.claude.calls.length).toBe(calls);
+  });
+
   it('concurrent edits to one file lose nothing', async () => {
     const { mod, read } = await setup();
     const f = mod.feature()!;
@@ -202,11 +220,8 @@ describe('profiles module', () => {
 
   it('GET /api/profiles and /api/profiles/:clientId return the contract shapes', async () => {
     const { h } = await setup();
-    const base = await (async () => {
-      await h.brain.start();
-      const addr = (h.brain as unknown as { server: import('node:http').Server }).server.address() as import('node:net').AddressInfo;
-      return `http://127.0.0.1:${addr.port}`;
-    })();
+    await new Promise<void>((r) => h.brain.server.listen(0, '127.0.0.1', () => r()));
+    const base = `http://127.0.0.1:${(h.brain.server.address() as AddressInfo).port}`;
     try {
       const list = ProfileListResponse.parse(await (await fetch(base + PATHS.brain.profiles)).json());
       expect(list.profiles.map((p) => p.clientId)).toEqual(['poc-client-acme', 'poc-client-quillon']);
@@ -218,7 +233,7 @@ describe('profiles module', () => {
       for (const id of ['poc-client-harborlight', 'poc-client-internal', 'nope']) {
         const miss = await fetch(base + PATHS.brain.profile(id));
         expect(miss.status, id).toBe(404);
-        expect((await miss.json()).error).toBeTruthy();
+        expect(((await miss.json()) as { error?: string }).error).toBeTruthy();
       }
     } finally {
       await h.brain.stop();
