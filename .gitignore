@@ -29,3 +29,10 @@ credentials.json
 # Personal data — lives in the private repo, never commit here
 chores.json
 data.json
+
+# Local workspace data (never commit)
+workspace.json
+logos/
+backups/
+test-results/
+artifact/
