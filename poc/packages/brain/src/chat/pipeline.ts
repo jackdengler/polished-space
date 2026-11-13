@@ -41,8 +41,12 @@ export interface TurnInput {
    * history (a prefix of the full text). Default: all of it.
    */
   keep?: (fullText: string) => string;
-  /** Note for the model at the start of this user message (e.g. "you were interrupted"). */
-  note?: string | null;
+  /**
+   * Called once the model has finished (not when aborted), before the turn is
+   * stored: voice uses it to finish sending audio and wait for playback, so an
+   * interruption during playback still trims what is kept. May abort `signal`.
+   */
+  settle?: (info: { fullText: string; error: string | null }) => Promise<void>;
 }
 
 export interface TurnResult {
@@ -145,7 +149,8 @@ export class ChatPipeline {
     const clients = (await ctx.clients()).filter((c) => !c.archived);
     const aliases: Record<string, string[]> = {};
     for (const c of clients) aliases[c.id] = await ctx.profiles.aliases(c.name);
-    const [tasks, calendarToday] = await Promise.all([ctx.myTasks(), this.calendarToday()]);
+    const [tasks, state] = await Promise.all([ctx.myTasks(), ctx.state.build().catch(() => null)]);
+    const calendarToday = state?.calendarToday ?? (await this.calendarToday());
     const context = contextText({
       now: ctx.clock.now(),
       today: ctx.clock.today(),
@@ -155,10 +160,12 @@ export class ChatPipeline {
       clients,
       tasks,
       suggestions: ctx.suggestions.list(),
-      nudges: (await ctx.state.build().then((s) => s.nudges).catch(() => [])) ?? [],
+      nudges: state?.nudges ?? [],
       calendarToday,
     });
-    const user = userMessage(input.text, input.via, context, context === this.conversation.lastContext, input.note ?? null);
+    const lastTurn = this.conversation.turns.at(-1);
+    const note = lastTurn?.interrupted ? 'Note: the user interrupted your previous reply; they heard only the part of it shown above.' : null;
+    const user = userMessage(input.text, input.via, context, context === this.conversation.lastContext, note);
     const history = this.conversation.history(this.maxTurns);
     const system = systemBlocks(ctx.config.me, clients, aliases);
     const source: SourceRef = { connector: input.via === 'voice' ? 'voice' : 'manual', id, label: `${input.via === 'voice' ? 'Said' : 'Typed'} in chat: "${snippet(input.text)}"` };
@@ -233,6 +240,13 @@ export class ChatPipeline {
     } catch (e) {
       error = userFacingError(e);
       ctx.log(`chat turn ${id} failed: ${(e as Error).message}`);
+    }
+    if (!signal.aborted && input.settle) {
+      try {
+        await input.settle({ fullText, error });
+      } catch (e) {
+        ctx.log(`chat turn ${id}: settle failed: ${(e as Error).message}`);
+      }
     }
     aborted = signal.aborted;
 
