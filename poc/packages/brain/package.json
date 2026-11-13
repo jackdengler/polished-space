@@ -11,6 +11,7 @@
     "@anthropic-ai/sdk": "^1.8.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@poc/contracts": "*",
+    "@poc/speech": "*",
     "zod": "^4.6.7",
     "ws": "^8.18.0"
   },
