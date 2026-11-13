@@ -36,3 +36,8 @@ logos/
 backups/
 test-results/
 artifact/
+
+# AI Work Assistant POC (sandbox data, secrets, test output)
+poc/data/
+poc/.env
+poc/test-results/

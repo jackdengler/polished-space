@@ -1,0 +1,28 @@
+{
+  "name": "planr-poc",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "AI Work Assistant proof of concept. Sandbox only: invented data, no real systems.",
+  "engines": { "node": ">=22" },
+  "workspaces": [
+    "packages/contracts",
+    "packages/pm-server",
+    "packages/mocks",
+    "packages/brain",
+    "packages/speech",
+    "packages/sidebar",
+    "seed"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "seed": "npm run seed -w @poc/seed --"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.0",
+    "vitest": "^5.1.0"
+  }
+}

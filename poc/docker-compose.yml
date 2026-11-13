@@ -1,0 +1,91 @@
+# AI Work Assistant POC sandbox (plan section 3.1).
+#
+#   npm --prefix poc run seed                      # creates poc/data/
+#   docker compose -f poc/docker-compose.yml up --build
+#
+# Every service sits on `sandbox` (internal: no route out). Only `gateway`
+# also sits on `edge`; it forwards outbound traffic to api.anthropic.com
+# only. Host ports bind to 127.0.0.1. All data lives in poc/data (gitignored).
+# Commands for services not built yet are placeholders (each package's
+# `start` script); builders replace the script, not this file.
+
+name: planr-poc
+
+networks:
+  sandbox:
+    internal: true
+  edge: {}
+
+x-node-service: &node-service
+  build:
+    context: ..
+    dockerfile: poc/Dockerfile.node
+  image: planr-poc-node:dev
+  restart: unless-stopped
+  networks: [sandbox]
+
+x-common-env: &common-env
+  POC_DATA_DIR: /data
+  POC_TZ: ${POC_TZ:-UTC}
+  TZ: ${POC_TZ:-UTC}
+  POC_NOW: ${POC_NOW:-}
+
+services:
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    networks: [sandbox, edge]
+    ports:
+      - "127.0.0.1:5180:5180"   # sidebar + /api -> brain
+      - "127.0.0.1:5181:5181"   # Planr test copy -> pm:8080
+      - "127.0.0.1:5182:5182"   # mocks control page -> mocks:8090
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./packages/sidebar/dist:/usr/share/nginx/html:ro
+
+  pm:
+    <<: *node-service
+    command: ["npm", "run", "start", "-w", "@poc/pm-server"]
+    environment:
+      <<: *common-env
+    volumes:
+      - ./data/pm:/data/pm
+
+  mocks:
+    <<: *node-service
+    command: ["npm", "run", "start", "-w", "@poc/mocks"]
+    environment:
+      <<: *common-env
+    volumes:
+      - ./data:/data:ro
+      - ./data/mocks:/data/mocks
+
+  brain:
+    <<: *node-service
+    command: ["npm", "run", "start", "-w", "@poc/brain"]
+    env_file:
+      - path: .env               # ANTHROPIC_API_KEY lives here (gitignored)
+        required: false
+    environment:
+      <<: *common-env
+      ANTHROPIC_BASE_URL: http://gateway:8443
+      PM_MCP_URL: http://pm:8081/mcp
+      MOCKS_URL: http://mocks:8090
+      SPEECH_URL: http://speech:7100
+      POC_MAX_USD_PER_DAY: ${POC_MAX_USD_PER_DAY:-5}
+    volumes:
+      - ./data:/data:ro           # files/ and seed-info.json, read only
+      - ./data/brain:/data/brain
+      - ./data/profiles:/data/profiles
+      - ./data/logs:/data/logs
+    depends_on: [pm, mocks, speech]
+
+  speech:
+    build:
+      context: ..
+      dockerfile: poc/Dockerfile.speech
+    image: planr-poc-speech:dev
+    restart: unless-stopped
+    networks: [sandbox]
+    environment:
+      TZ: ${POC_TZ:-UTC}

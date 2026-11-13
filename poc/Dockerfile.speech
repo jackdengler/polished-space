@@ -1,0 +1,7 @@
+# Placeholder for the speech service (Phase 1D owns this file).
+# 1D replaces it with an image that bakes the speech models in at build time,
+# so the container needs no network at run time. Context is the repo root.
+FROM node:22-bookworm-slim
+WORKDIR /repo/poc
+COPY poc/packages/speech/package.json packages/speech/
+CMD ["node", "-e", "console.log('@poc/speech: placeholder, not built yet'); setInterval(() => {}, 1 << 30)"]

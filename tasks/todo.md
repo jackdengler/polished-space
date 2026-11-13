@@ -804,10 +804,10 @@ Builders use `model: opus`, one focused piece each. **Phase 0 must finish first.
 
 ### Phase 0: Foundations (one builder, in order)
 
-- [ ] **0.1 Scaffold `poc/`:** workspaces, `tsconfig.base.json`, vitest, `Dockerfile.node`, `env.example`, `.gitignore` additions (`poc/data/`). *Check:* `npm --prefix poc run typecheck` and an empty test run pass; root `npm test` and `npm run build` still pass.
-- [ ] **0.2 Contracts package:** every schema in section 4, connector interfaces, MCP tool schemas, endpoint constants, plus a `FakeClaude` and fake connectors for tests. *Check:* unit tests parse one valid and one invalid sample of each schema.
-- [ ] **0.3 Seed data and `npm run poc:seed`:** the five clients, team, tasks, mail, chat, calendar relative to now, files, starter profiles, `.poc-sandbox` marker. *Check:* the seeded workspace passes `parseWorkspace`; a test scans seed text against a deny-list; a person reads the seed once for realism.
-- [ ] **0.4 Compose skeleton and gateway config:** networks, volumes, ports, placeholder services. *Check:* `docker compose config` is valid.
+- [x] **0.1 Scaffold `poc/`:** workspaces, `tsconfig.base.json`, vitest, `Dockerfile.node`, `env.example`, `.gitignore` additions (`poc/data/`). *Check:* `npm --prefix poc run typecheck` and an empty test run pass; root `npm test` and `npm run build` still pass.
+- [x] **0.2 Contracts package:** every schema in section 4, connector interfaces, MCP tool schemas, endpoint constants, plus a `FakeClaude` and fake connectors for tests. *Check:* unit tests parse one valid and one invalid sample of each schema.
+- [x] **0.3 Seed data and `npm run poc:seed`:** the five clients, team, tasks, mail, chat, calendar relative to now, files, starter profiles, `.poc-sandbox` marker. *Check:* the seeded workspace passes `parseWorkspace`; a test scans seed text against a deny-list; a person reads the seed once for realism.
+- [x] **0.4 Compose skeleton and gateway config:** networks, volumes, ports, placeholder services. *Check:* `docker compose config` is valid.
 
 ### Phase 1: Independent pieces (five builders in parallel; all depend only on Phase 0)
 

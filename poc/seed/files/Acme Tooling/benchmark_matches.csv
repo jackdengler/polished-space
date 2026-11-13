@@ -1,0 +1,9 @@
+job_code,acme_title,survey_match,match_quality,employees,base_median,market_p50,ratio
+ATC-M101,Maintenance Technician II,Maintenance Technician (Level 2),Good,38,58400,61900,0.94
+ATC-M140,Maintenance Planner,Maintenance Planner/Scheduler,Weak,6,63100,72300,0.87
+ATC-P210,CNC Machinist,CNC Machinist (Level 2),Good,54,55200,56800,0.97
+ATC-P230,CNC Lead,Production Lead (Machining),Weak,9,64800,73900,0.88
+ATC-E310,Manufacturing Engineer,Manufacturing Engineer (Level 2),Good,14,89500,88100,1.02
+ATC-E330,Quality Engineer,Quality Engineer (Level 2),Good,8,84200,84000,1.00
+ATC-C410,HR Generalist,HR Generalist,Good,4,67300,64600,1.04
+ATC-C450,Financial Analyst,Financial Analyst (Level 2),Good,5,74100,71300,1.04

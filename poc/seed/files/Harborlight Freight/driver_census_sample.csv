@@ -1,0 +1,9 @@
+employee_id,region,role,tenure_years,hourly_rate,annual_base,overtime_hours
+HLF-0001,North,Linehaul Driver,7.5,29.40,61152,
+HLF-0002,North,Linehaul Driver,2.1,26.10,54288,
+HLF-0003,Coastal,Linehaul Driver,11.0,31.25,65000,
+HLF-0004,Coastal,Local Delivery Driver,4.3,24.80,51584,
+HLF-0005,Inland,Local Delivery Driver,1.2,22.90,47632,
+HLF-0006,Inland,Linehaul Driver,5.8,27.60,57408,
+HLF-0007,Coastal,Driver Trainer,9.4,33.10,68848,
+HLF-0008,North,Local Delivery Driver,3.0,24.10,50128,

@@ -1,0 +1,8 @@
+Tessera Foods - data request (sent by Dana Kim)
+
+Please provide:
+1. Employee census with level, tenure, location and base pay.
+2. Job descriptions for warehouse lead roles.
+3. Any pay adjustments made in the last 12 months.
+
+Status: items 1 and 3 received. Item 2 outstanding.

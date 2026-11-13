@@ -1,0 +1,15 @@
+# Used by BuildKit for Dockerfile.node (context = repo root).
+**/node_modules
+**/dist
+.git
+poc/data
+poc/.env
+poc/test-results
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+workspace.json
+backups
+test-results
+artifact

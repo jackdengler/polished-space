@@ -1,0 +1,15 @@
+{
+  "name": "@poc/seed",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Invented seed data for the POC sandbox. Writes poc/data/ (gitignored).",
+  "scripts": {
+    "seed": "tsx src/run.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@poc/contracts": "*",
+    "zod": "^4.6.7"
+  }
+}
