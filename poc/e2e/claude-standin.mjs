@@ -76,6 +76,15 @@ const nextWeekday = (today, idx) => {
   while (weekdayIdx(d) !== idx) d = addDays(d, 1);
   return d;
 };
+/** `n` working days (Mon-Fri) after `iso`. */
+const workdaysAfter = (iso, n) => {
+  let d = iso;
+  for (let k = 0; k < n; ) {
+    d = addDays(d, 1);
+    if (weekdayIdx(d) < 5) k++;
+  }
+  return d;
+};
 /** A due date from the text. `strict`: only "by/before/on/until <day>" counts (a meeting preference is not a deadline). */
 function dueFrom(text, today, strict = false) {
   const t = text.toLowerCase();
@@ -169,18 +178,22 @@ function triage(body) {
     const type = /\b(chase|follow up|nudge)\b/i.test(ask) ? 'follow_up' : /\b(reply|answer|respond)\b/i.test(ask) ? 'reply_email' : /\b(review|read)\b/i.test(ask) ? 'review_file' : /\b(meet|schedule|book)\b/i.test(ask) ? 'schedule_meeting' : 'other';
     add(cap(ask || text), type, 'i_owe', dueFrom(text, today));
   } else {
+    // Scheduling rule from the triage prompt (when it is on): every i_owe task gets a date;
+    // a reply or meeting reply someone is waiting on is due today unless the message names a later day.
+    const schedule = /Schedule what the user owes/.test(sys);
+    const owe = (d) => d ?? (schedule ? today : null);
     if (/\b(we'll|we will|i'll|will) send you\b|\bsend you the\b.*\bby\b/i.test(text)) {
       const thing = /send you (?:the )?(.+?)(?: by| on|\.|$)/i.exec(text)?.[1] ?? 'what they promised';
       add(`Expect ${thing} from ${who || 'them'}`, 'other', 'owed_to_me', dueFrom(text, today, true));
     }
     const fileM = /"([^"]+\.(?:pdf|md|csv|txt))"/i.exec(text);
-    if (fileM && /\b(read|review|look|check|take)\b/i.test(text)) add(`Review ${fileM[1]}`, 'review_file', 'i_owe', dueFrom(text, today, true));
-    if (/\bupdate\b|where .* stands|how is .* coming|\?/.test(lower) && !fileM && !/want me to chase/.test(lower)) add(`Reply to ${who || 'them'} with an update on ${topic}`, 'reply_email', 'i_owe', dueFrom(text, today, true));
+    if (fileM && /\b(read|review|look|check|take)\b/i.test(text)) add(`Review ${fileM[1]}`, 'review_file', 'i_owe', dueFrom(text, today, true) ?? (schedule ? workdaysAfter(today, 1) : null));
+    if (/\bupdate\b|where .* stands|how is .* coming|\?/.test(lower) && !fileM && !/want me to chase/.test(lower) && !/ignore (all |your )?(previous |prior )?instructions|mark (all|every) tasks?/.test(lower)) add(`Reply to ${who || 'them'} with an update on ${topic}`, 'reply_email', 'i_owe', owe(dueFrom(text, today, true)));
     if (/\bmeet\b|minutes with you|time to talk|lock in a time|a call\b/.test(lower)) {
       const mins = /(\d{2,3})\s*minutes/.exec(lower)?.[1];
-      add(`Set up a ${mins ? `${mins}-minute ` : ''}meeting with ${who || 'them'}`, 'schedule_meeting', 'i_owe', null);
+      add(`Set up a ${mins ? `${mins}-minute ` : ''}meeting with ${who || 'them'}`, 'schedule_meeting', 'i_owe', owe(null));
     }
-    if (/want me to chase/.test(lower)) add(`Confirm when ${topic} go out`, 'follow_up', 'i_owe', null);
+    if (/want me to chase/.test(lower)) add(`Confirm when ${topic} go out`, 'follow_up', 'i_owe', owe(null));
   }
 
   // Duplicates: same client, same kind of task, same person.
@@ -204,7 +217,12 @@ function triage(body) {
 
   const profileEdits =
     confidence === 'high' && client && kind !== 'manual' && kind !== 'voice'
-      ? tasks.filter((t) => !t.duplicateOf).map((t) => ({ section: t.direction === 'owed_to_me' ? 'Commitments: they owe' : 'Commitments: we owe', op: 'add', text: t.title }))
+      ? [
+          // Deliberately also proposes commitments (a real model may, despite the prompt), so the e2e proves the brain
+          // holds them back until approval (D3); plus one preference-style edit that should land at triage.
+          ...tasks.map((t) => ({ section: t.direction === 'owed_to_me' ? 'Commitments: they owe' : 'Commitments: we owe', op: 'add', text: t.title })),
+          ...(kind === 'mail' && who ? [{ section: 'Key contacts', op: 'add', text: `${senderName}: wrote on ${today} about ${topic}` }] : []),
+        ]
       : [];
   return { clientId, confidence, alias, nudge, tasks, meetingRequest, profileEdits };
 }
@@ -221,11 +239,11 @@ function prioritise(body) {
   let fitNow = null;
   if (gap && ordered.length) {
     const pick = ordered.find((t) => !quick(t) && !t.owed) ?? ordered[0];
-    const mins = Number(gap[1]);
-    const span = mins >= 55 ? 'an hour' : `${mins} minutes`;
-    fitNow = { taskId: pick.id, sentence: `You've got ${span} before your ${gap[5]} ${gap[4].split(':')[0]} meeting. Let's ${pick.title.charAt(0).toLowerCase()}${pick.title.slice(1)}.` };
+    // Only what to do: the brain puts the code-computed gap ("You've got 1 hour 40 minutes before your 3pm ...") in front.
+    fitNow = { taskId: pick.id, sentence: `Let's ${pick.title.charAt(0).toLowerCase()}${pick.title.slice(1)}.` };
   }
-  const big = ordered.find((t) => t.type === 'review_file') ?? null;
+  const comingUp = [...u.matchAll(/^- "(.*)" \(id=([^;]+); client=([^;]+); type=([^;]+); due /gm)].map((m) => ({ title: m[1], id: m[2], type: m[4] }));
+  const big = ordered.find((t) => t.type === 'review_file') ?? comingUp.find((t) => t.type === 'review_file') ?? null;
   return { order, fitNow, focusBlock: big ? { taskId: big.id, minutes: 60 } : null };
 }
 
@@ -270,8 +288,14 @@ function prepare(type, body) {
     // Prefer the days (and afternoon) the requester named in the material.
     const material = (/Material \(untrusted[\s\S]*$/.exec(f.text)?.[0] ?? '').toLowerCase();
     const cands = [...f.text.matchAll(/^- (t\d+): (\w+) [^,]+, (\d{2}):\d{2}/gm)].map((m, i) => ({ id: m[1], i, score: (material.includes(m[2].toLowerCase()) ? 2 : 0) + (/afternoon/.test(material) && Number(m[3]) >= 12 ? 1 : 0) + (/morning/.test(material) && Number(m[3]) < 12 ? 1 : 0) }));
-    const ids = [...cands].sort((a, b) => b.score - a.score || a.i - b.i).map((c) => c.id);
-    return { slotIds: ids.slice(0, 3), body: `Hi ${first(to?.name ?? 'there')},\n\nHappy to walk through it together. Would any of these work for you?\n\n[[TIMES]]\n\nIf none suit, send me a couple of times that do.${sign}`, nextStep: NONE };
+    const offered = /were already shown to the user/.test(f.text);
+    const ids = offered ? cands.map((c) => c.id) : [...cands].sort((a, b) => b.score - a.score || a.i - b.i).map((c) => c.id);
+    const who = first(to?.name ?? 'them');
+    return {
+      slotIds: ids.slice(0, 3),
+      body: `Hi ${first(to?.name ?? 'there')},\n\nHappy to walk through it together. Would any of these work for you?\n\n[[TIMES]]\n\nIf none suit, send me a couple of times that do.${sign}`,
+      nextStep: { kind: 'task', title: `Send ${who} the calendar invite once ${who} confirms a time`, nudge: `When ${who} picks a time, shall I remind you to send the invite?`, toName: null, subject: '', body: '', dueDate: workdaysAfter(todayOf(f.text), 1), taskType: 'other' },
+    };
   }
   if (type === 'review_file') {
     const fileText = /<material label="File [^"]*">\n([\s\S]*?)\n<\/material>/.exec(f.text)?.[1];
@@ -294,7 +318,11 @@ function prepare(type, body) {
     return {
       subject: lastSubject ? `Re: ${lastSubject}` : `Following up: ${f.task}`,
       body: `Hi ${first(to?.name ?? 'there')},\n\n${lastSubject ? `Just following up on my email "${lastSubject}".` : `Just following up on ${f.task.replace(/^chase\s+\S+(\s+\S+)?\s*/i, '') || 'my last note'}.`} Could you let me know where things are when you get a moment?${sign}`,
-      nextStep: NONE,
+      nextStep: (() => {
+        const due = workdaysAfter(todayOf(f.text), 2);
+        const who = first(to?.name ?? 'them');
+        return { kind: 'task', title: `Check for a reply from ${who}`, nudge: `Shall I add a reminder to check for ${who}'s reply on ${WEEKDAYS[weekdayIdx(due)]}?`, toName: null, subject: '', body: '', dueDate: due, taskType: 'follow_up' };
+      })(),
     };
   }
   const contact = f.contacts[0];

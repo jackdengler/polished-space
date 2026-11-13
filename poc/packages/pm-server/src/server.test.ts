@@ -199,6 +199,23 @@ describe('pm-server', () => {
       expect(await readFile(join(dataDir, 'pm', 'workspace.json'), 'utf8')).toBe(before);
     });
 
+    it('D1: refuses impossible dates, unknown members and unknown deliverables over MCP, and changes nothing', async () => {
+      const { task } = TaskOutput.parse((await call('create_task', { clientId: ACME, title: 'Date guard' })).structuredContent);
+      const before = await readFile(join(dataDir, 'pm', 'workspace.json'), 'utf8');
+      for (const [name, args] of [
+        ['reschedule_task', { taskId: task.id, dueDate: '2026-13-45' }],
+        ['reschedule_task', { taskId: task.id, dueDate: '2026-02-30' }],
+        ['create_task', { clientId: ACME, title: 'x', dueDate: '2026-02-29' }],
+        ['create_task', { clientId: ACME, title: 'x', assigneeIds: ['nobody'] }],
+        ['create_task', { clientId: ACME, title: 'x', deliverableId: 'no-such-deliverable' }],
+      ] as const) {
+        const r = await call(name, args);
+        expect(r.isError, `${name} ${JSON.stringify(args)}`).toBe(true);
+      }
+      expect(JSON.stringify((await call('create_task', { clientId: ACME, title: 'x', assigneeIds: ['nobody'] })).content)).toMatch(/No team member/);
+      expect(await readFile(join(dataDir, 'pm', 'workspace.json'), 'utf8')).toBe(before);
+    });
+
     it('serialises concurrent writes (no lost updates)', async () => {
       const results = await Promise.all(Array.from({ length: 10 }, (_, i) => call('create_task', { clientId: ACME, title: `Parallel ${i}` })));
       expect(results.every((r) => !r.isError)).toBe(true);

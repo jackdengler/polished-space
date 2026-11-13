@@ -4,7 +4,7 @@ import { api, ApiError } from '../api';
 import { useUi } from '../store';
 import { SOURCE_ICON, TASK_TYPE_LABEL, relativeDue } from '../format';
 import { Icon } from './Icon';
-import { SuggestionCard } from './SuggestionCard';
+import { OPENABLE, SuggestionCard } from './SuggestionCard';
 
 /**
  * Animate rows that moved within their section (FLIP), so a reorder reads as
@@ -35,6 +35,7 @@ function useFlip(listRef: React.RefObject<HTMLUListElement | null>, key: string)
 function TaskRow({ task, index, isToday }: { task: SidebarTask; index: number; isToday: boolean }) {
   const today = useUi((s) => s.state?.today ?? '');
   const open = useUi((s) => s.open);
+  const openSource = useUi((s) => s.openSource);
   const offline = useUi((s) => s.connection === 'lost');
   const [holdBusy, setHoldBusy] = useState(false);
   const [holdError, setHoldError] = useState<string | null>(null);
@@ -85,7 +86,7 @@ function TaskRow({ task, index, isToday }: { task: SidebarTask; index: number; i
             ) : task.preparedStatus === 'failed' ? (
               <span className="prep prep-failed">Prep failed</span>
             ) : null}
-            {task.source ? (
+            {task.source && !OPENABLE.has(task.source.connector) ? (
               <span className="task-src" title={task.source.label}>
                 <Icon name={SOURCE_ICON[task.source.connector]} size={11} />
               </span>
@@ -94,6 +95,18 @@ function TaskRow({ task, index, isToday }: { task: SidebarTask; index: number; i
           {isToday && task.reason ? <span className="task-reason">{task.reason}</span> : null}
         </span>
       </button>
+      {task.source && OPENABLE.has(task.source.connector) ? (
+        <button
+          type="button"
+          className="icon-btn task-hold task-src-btn"
+          onClick={(e) => openSource(task.source!, e.currentTarget)}
+          aria-label={`Open the source of “${task.title}”: ${task.source.label}`}
+          aria-haspopup="dialog"
+          title={`Open: ${task.source.label}`}
+        >
+          <Icon name={SOURCE_ICON[task.source.connector]} size={14} />
+        </button>
+      ) : null}
       <button
         type="button"
         className="icon-btn task-hold"

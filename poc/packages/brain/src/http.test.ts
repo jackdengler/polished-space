@@ -2,10 +2,12 @@
 import { connect } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FileView, InputResponse, PATHS, PreparedResponse, ProfileDoc, ProfileListResponse, SidebarState, UsageResponse } from '@poc/contracts';
+import { BRAIN_SSE_EVENTS, ConversationResponse, FileView, HEARTBEAT_MS, InputResponse, PATHS, PreparedResponse, ProfileDoc, ProfileListResponse, SidebarState, SourceMessage, UsageResponse } from '@poc/contracts';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createModules } from './modules';
 import type { BrainModule } from './modules/types';
-import { TODAY, makeHarness, michaelMail, task, triage, type Harness } from './testing/harness';
+import { TODAY, makeDataDir, makeHarness, michaelMail, task, triage, type Harness } from './testing/harness';
 
 const running: Harness[] = [];
 afterEach(async () => {
@@ -116,6 +118,43 @@ describe('core routes', () => {
     expect(nudge).toMatchObject({ kind: 'new_item' });
     const last = events.filter((e) => e.event === 'state').pop()!.data as SidebarState;
     expect(last.suggestions).toHaveLength(2);
+  });
+
+  it('D2: sends a named heartbeat event at least every HEARTBEAT_MS', async () => {
+    const { base } = await up();
+    const t0 = Date.now();
+    const events = await readSse(base + PATHS.brain.events, (ev) => ev.some((e) => e.event === 'heartbeat'));
+    const hb = events.find((e) => e.event === 'heartbeat');
+    expect(hb, 'no heartbeat').toBeTruthy();
+    expect(BRAIN_SSE_EVENTS.heartbeat.safeParse(hb!.data).success).toBe(true);
+    expect(Date.now() - t0).toBeLessThan(HEARTBEAT_MS + 1500);
+  });
+
+  it('D4: GET /api/sources returns the original email and chat message; unknown ids are a readable 404', async () => {
+    const { h, call } = await up();
+    const m = h.mail.deliver(michaelMail);
+    const c = h.chat.deliver({ sender: 'priya.shah@brightline-advisory.example', sender_display_name: 'Priya Shah', message: 'Harbor sent the driver pay draft.' });
+    const mail = await call('GET', PATHS.brain.source('mail', m.id));
+    expect(mail.status).toBe(200);
+    expect(SourceMessage.parse(mail.body)).toMatchObject({ connector: 'mail', from: { name: 'Michael Okafor' }, subject: michaelMail.subject, body: michaelMail.body });
+    const chat = await call('GET', PATHS.brain.source('chat', c.id));
+    expect(SourceMessage.parse(chat.body)).toMatchObject({ connector: 'chat', from: { name: 'Priya Shah' }, subject: null, body: 'Harbor sent the driver pay draft.' });
+    const missing = await call('GET', PATHS.brain.source('mail', 'nope'));
+    expect(missing).toMatchObject({ status: 404, body: { error: 'That email is no longer in the mailbox.' } });
+    expect((await call('GET', '/api/sources/files/x')).status).toBe(400);
+  });
+
+  it('D10: GET /api/conversation returns the stored turns (typed and spoken, with interrupted markers)', async () => {
+    const dataDir = await makeDataDir();
+    await mkdir(join(dataDir, 'brain'), { recursive: true });
+    const turn = (id: string, via: 'text' | 'voice', user: string, assistant: string, interrupted: boolean) => ({ id, at: '2026-11-13T13:40:00.000Z', via, user, assistant, interrupted, suggestionIds: [], messageStart: 0, messageEnd: 0 });
+    await writeFile(join(dataDir, 'brain', 'conversation.json'), JSON.stringify({ version: 1, messages: [], lastContext: null, turns: [turn('t1', 'text', 'What is next?', 'The Acme reply.', false), turn('t2', 'voice', 'Tell me about my day', 'Here is your', true)] }));
+    const { call } = await up(createModules(), { dataDir });
+    const r = ConversationResponse.parse((await call('GET', PATHS.brain.conversation)).body);
+    expect(r.turns.map((t) => [t.via, t.user, t.assistant, t.interrupted])).toEqual([
+      ['text', 'What is next?', 'The Acme reply.', false],
+      ['voice', 'Tell me about my day', 'Here is your', true],
+    ]);
   });
 });
 

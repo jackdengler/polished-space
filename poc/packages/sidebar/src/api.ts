@@ -1,5 +1,7 @@
 import {
   CHAT_SSE_EVENTS,
+  ConversationResponse,
+  SourceMessage,
   DecisionResponse,
   FileView,
   InputResponse,
@@ -42,6 +44,9 @@ export function checked<S extends z.ZodType>(schema: S, data: unknown, what: str
   return data as z.infer<S>;
 }
 
+/** What the user reads when the assistant (brain) is not answering: plain English, never a proxy's error text. */
+export const ASSISTANT_DOWN = 'The assistant isn’t answering right now, so nothing was changed. Try again in a moment.';
+
 async function request(path: string, init?: RequestInit): Promise<unknown> {
   let res: Response;
   try {
@@ -50,7 +55,18 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
       headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
     });
   } catch {
-    throw new ApiError('Could not reach the assistant. Check the connection and try again.', 0);
+    throw new ApiError(ASSISTANT_DOWN, 0);
+  }
+  // The gateway answers for a brain that is down (code "upstream_down"); a bare 502/504 with no JSON body is the same.
+  if (res.status === 502 || res.status === 503 || res.status === 504) {
+    const text = await res.clone().text();
+    let parsed: { code?: string; error?: string } | null = null;
+    try {
+      parsed = JSON.parse(text) as { code?: string; error?: string };
+    } catch {
+      /* not JSON */
+    }
+    if (!parsed || parsed.code === 'upstream_down' || typeof parsed.error !== 'string') throw new ApiError(ASSISTANT_DOWN, res.status);
   }
   const text = await res.text();
   let body: unknown = null;
@@ -116,6 +132,15 @@ export const api = {
   async profile(clientId: string): Promise<ProfileDoc> {
     return checked(ProfileDoc, await request(PATHS.brain.profile(clientId)), 'GET profile');
   },
+
+  /** The original email or chat message behind a source link. */
+  async source(connector: 'mail' | 'chat', id: string): Promise<SourceMessage> {
+    return checked(SourceMessage, await request(PATHS.brain.source(connector, id)), 'GET source');
+  },
+
+  async conversation(): Promise<ConversationResponse['turns']> {
+    return checked(ConversationResponse, await request(PATHS.brain.conversation), 'GET conversation').turns;
+  },
 };
 
 export type ChatEvent =
@@ -136,7 +161,11 @@ export async function streamChat(text: string, onEvent: (e: ChatEvent) => void, 
     });
   } catch (e) {
     if (signal?.aborted) return;
-    throw new ApiError('Could not reach the assistant.', 0);
+    throw new ApiError(ASSISTANT_DOWN, 0);
+  }
+  if ((res.status === 502 || res.status === 504) && !(res.headers.get('content-type') ?? '').includes('event-stream')) {
+    const b = (await res.clone().json().catch(() => null)) as { code?: string } | null;
+    if (!b || b.code === 'upstream_down') throw new ApiError(ASSISTANT_DOWN, res.status);
   }
   if (!res.ok || !res.body) {
     let msg = `Chat failed (${res.status})`;

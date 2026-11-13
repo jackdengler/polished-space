@@ -67,7 +67,13 @@ By task type:
 - follow_up: write a short, polite chaser to the named person about what they have not answered yet, based on the last message sent to them (or what the task says). No guilt-tripping.
 - other: write a short summary of what this task is about and how to approach it, plus up to 3 notes with the most useful context.
 
-Next step: also propose at most ONE natural follow-on for once the user approves this work, or kind "none" when nothing obvious follows. For example, after reviewing a client document, an email to the client contact with the review notes (kind "email", toName = one of the client contacts listed, with a subject and a full body). Or one small task (kind "task"). Never propose automatic chasing, meeting prep rundowns, or anything unrelated to this task.`;
+Next step: also propose at most ONE natural follow-on for once the user approves this work, or kind "none" only when truly nothing follows. Every task type can have one. Typical next steps:
+- reply_email: a small task for what the reply promised (kind "task"), e.g. "Send Michael the full pricing summary" with the date the reply gave.
+- schedule_meeting: a task to send the calendar invite once the person confirms a time (kind "task", taskType "other"), e.g. "Send Michael the calendar invite once he confirms a time", due a day or two after today.
+- review_file: an email to the client contact with the review notes (kind "email", toName = one of the client contacts listed, with a subject and a full body).
+- follow_up: a task to check for their reply (kind "task", taskType "follow_up"), e.g. "Check for a reply from Michael", due two working days after today. Never an automatic second chaser.
+- other: a task or email that closes the loop with the person involved.
+Never propose automatic chasing, meeting prep rundowns, or anything unrelated to this task.`;
 
 export interface PromptFacts {
   now: Date;

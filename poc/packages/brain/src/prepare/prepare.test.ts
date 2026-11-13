@@ -301,6 +301,39 @@ describe('follow_up quotes the unanswered sent email (Sent folder read)', () => 
   });
 });
 
+describe('next step for every task type (D5) and a stable chase target (D7)', () => {
+  it('a meeting reply lines up "send the invite once they confirm"; a chaser lines up "check for a reply" (a task, never a second chaser)', async () => {
+    const { h, settle } = await setup();
+    const mail = h.mail.deliver({ from: MICHAEL, subject: 'Time to meet', body: 'Could we find 30 minutes next week?' });
+    h.claude.enqueue({ parsed: { slotIds: [], body: 'Hi Michael,\n\n[[TIMES]]\n\nAlex', nextStep: { kind: 'task', title: 'Send Michael the calendar invite once he confirms a time', nudge: 'Remind you to send the invite?', toName: null, subject: '', body: '', dueDate: '2026-11-16', taskType: 'other' } } });
+    const meetingId = await approveTask(h, settle, { title: 'Set up a call with Michael', clientId: 'poc-client-acme', taskType: 'schedule_meeting', source: mailSource(mail) });
+    h.claude.enqueue({ parsed: { subject: 's', body: 'Hi Michael,\n\nA nudge.\n\nAlex', nextStep: { kind: 'task', title: 'Check for a reply from Michael', nudge: 'Remind you to check?', toName: null, subject: '', body: '', dueDate: '2026-11-17', taskType: 'follow_up' } } });
+    const chaseId = await approveTask(h, settle, { title: 'Chase Michael', clientId: 'poc-client-acme', taskType: 'follow_up', source: { connector: 'voice', id: 'voice-2', label: 'Said: "chase Michael"' } });
+    for (const id of [meetingId, chaseId]) {
+      const sid = h.brain.taskMeta.get(id)!.preparedSuggestionId!;
+      await h.brain.approve(sid);
+      await settle();
+    }
+    const next = h.brain.suggestions.list().filter((s) => s.source?.connector === 'next_step');
+    expect(next.map((s) => [s.source!.id, s.kind, s.title])).toEqual([
+      [meetingId, 'create_task', 'Send Michael the calendar invite once he confirms a time'],
+      [chaseId, 'create_task', 'Check for a reply from Michael'],
+    ]);
+    expect(next.every((s) => s.kind === 'create_task')).toBe(true);
+  });
+
+  it('the chaser answers the email the contact went quiet on, not a reply sent minutes ago', async () => {
+    const { h, mod, settle } = await setup();
+    h.mail.seedSent({ to: [MICHAEL], cc: [], subject: 'Job match sign-off', body: 'Could you sign off the matches?', replyToMessageId: null }, '2026-11-08T10:00:00.000Z');
+    h.mail.seedSent({ to: [MICHAEL], cc: [], subject: 'Re: Market pricing: where are we?', body: 'Here is the update.', replyToMessageId: null }, '2026-11-13T13:40:00.000Z');
+    h.claude.enqueue({ parsed: { subject: 'ignored', body: 'Hi Michael,\n\nA nudge.\n\nAlex', nextStep: none } });
+    const taskId = await approveTask(h, settle, { title: 'Chase Michael', clientId: 'poc-client-acme', taskType: 'follow_up', source: { connector: 'voice', id: 'voice-3', label: 'Said: "chase Michael"' } });
+    const r = prepared(mod, taskId);
+    if (r.prepared?.type !== 'follow_up') throw new Error('type');
+    expect(r.prepared.draft.subject).toBe('Re: Job match sign-off');
+  });
+});
+
 describe('other', () => {
   it('gathers context with source refs', async () => {
     const { h, mod, settle } = await setup();
@@ -432,5 +465,15 @@ describe('routes, regenerate, failure', () => {
     expect(prepared(mod, task.id).status).toBe('ready');
     expect(h.writes).toHaveLength(0);
     expect(h.mail.sent).toHaveLength(0);
+  });
+});
+
+describe('preferredSlots (times shown on the meeting suggestion card)', () => {
+  it('keeps to the days and part of day the requester named', async () => {
+    const { preferredSlots } = await import('./slots');
+    const slot = (d: string, h: number) => ({ start: `${d}T${String(h).padStart(2, '0')}:00:00.000Z`, end: `${d}T${String(h).padStart(2, '0')}:45:00.000Z` });
+    const cands = [slot('2026-11-16', 9), slot('2026-11-16', 13), slot('2026-11-17', 10), slot('2026-11-17', 13), slot('2026-11-17', 15), slot('2026-11-18', 13), slot('2026-11-18', 15)];
+    const out = preferredSlots(cands, 'Tuesday or Wednesday afternoon would suit me best', 'UTC', '2026-11-13', 3);
+    expect(out.map((s) => s.start.slice(0, 13))).toEqual(['2026-11-17T13', '2026-11-17T15', '2026-11-18T13']);
   });
 });

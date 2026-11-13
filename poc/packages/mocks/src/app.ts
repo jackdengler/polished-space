@@ -66,6 +66,12 @@ export function createApp(opts: AppOptions): Handler {
     return new Date(Math.max(opts.now().getTime(), newest) + 1).toISOString();
   };
 
+  /** Demo/test fault injection: the next write to this target answers 503 (an outage, for the "failed" path). */
+  const failNext = new Set<'calendar' | 'mail'>();
+  const maybeFail = (target: 'calendar' | 'mail') => {
+    if (failNext.delete(target)) throw new HttpError(503, 'unavailable right now (simulated outage)');
+  };
+
   const routes: Route[] = [
     // ---- Fake Graph: mail ----
     get(PATHS.graph.messages, (_req, url) => {
@@ -82,6 +88,7 @@ export function createApp(opts: AppOptions): Handler {
       return json(200, found);
     }),
     post(PATHS.graph.sendMail, async (req) => {
+      maybeFail('mail');
       const { message } = parse(GraphSendMailRequest, await readJson(req));
       const sent = store.read('sent');
       const me = store.seedInfo().me;
@@ -119,6 +126,7 @@ export function createApp(opts: AppOptions): Handler {
       return json(200, { value });
     }),
     post(PATHS.graph.events, async (req) => {
+      maybeFail('calendar');
       const input = parse(NewCalEvent, await readJson(req));
       if (input.start.timeZone !== 'UTC' || input.end.timeZone !== 'UTC') {
         throw new HttpError(400, 'the mock only accepts timeZone "UTC" (use toGraphDateTime)');
@@ -206,6 +214,12 @@ export function createApp(opts: AppOptions): Handler {
     post(PATHS.control.reset, () => {
       store.reset();
       return json(200, { ok: true });
+    }),
+    post('/_control/fail-next', async (req) => {
+      const body = (await readJson(req)) as { target?: string };
+      if (body.target !== 'calendar' && body.target !== 'mail') throw new HttpError(400, 'target must be "calendar" or "mail"');
+      failNext.add(body.target);
+      return json(200, { ok: true, target: body.target });
     }),
     get(PATHS.control.canned, () => json(200, store.read('canned'))),
     get(PATHS.control.sent, () => json(200, store.read('sent'))),

@@ -220,6 +220,7 @@ export class FixtureBrain {
     return {
       taskId,
       source: t.source,
+      meetingSlots: [],
       direction: t.direction ?? 'i_owe',
       taskType: t.taskType ?? 'other',
       onHold: t.onHold,

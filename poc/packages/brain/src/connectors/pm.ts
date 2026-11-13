@@ -23,6 +23,16 @@ import {
 
 export class McpToolError extends Error {
   override name = 'McpToolError';
+  /**
+   * True when Planr answered and refused the input (unknown id, bad date...):
+   * nothing was written. False for transport or shape problems.
+   */
+  constructor(
+    message: string,
+    readonly refused = false,
+  ) {
+    super(message);
+  }
 }
 
 export class McpPmConnector implements PmConnector {
@@ -75,7 +85,7 @@ export class McpPmConnector implements PmConnector {
       result = await attempt();
     }
     const content = (result.content ?? []) as { type: string; text?: string }[];
-    if (result.isError) throw new McpToolError(`${name} failed: ${content.find((c) => c.type === 'text')?.text ?? 'unknown error'}`);
+    if (result.isError) throw new McpToolError(`Planr refused it: ${(content.find((c) => c.type === 'text')?.text ?? 'unknown error').replace(/^MCP error -?\d+:\s*/, '')}`, true);
     let payload: unknown = result.structuredContent;
     if (payload === undefined) {
       const text = content.find((c) => c.type === 'text')?.text;

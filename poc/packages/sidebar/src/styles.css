@@ -416,3 +416,24 @@ select.text-input { padding-right: 4px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Source links (D4): a chip that opens the original message */
+button.chip-link { cursor: pointer; font: inherit; font-size: 11.5px; text-align: left; }
+button.chip-link:hover { color: var(--text); border-color: var(--border-strong, var(--text-faint)); }
+button.chip-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.chip-link .chip-text { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 2px; }
+.dialog-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.35); display: flex; align-items: flex-start; justify-content: center; padding: 48px 10px 10px; }
+.dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 60px); display: flex; flex-direction: column; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25); }
+.dialog-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--border); }
+.dialog-title { flex: 1; font-size: 14.5px; font-weight: 650; outline: none; }
+.dialog-body { padding: 12px 14px 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.src-head dd { overflow-wrap: anywhere; }
+.src-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); }
+.src-body:focus-visible { outline: 2px solid var(--accent); }
+
+/* Meeting times on a schedule-meeting suggestion card */
+.sg-slots { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.sg-slots li { display: flex; align-items: center; gap: 6px; color: var(--text); }
+.sg-slots svg { color: var(--text-faint); flex: none; }
+.sg-assign { font-size: 12.5px; color: var(--text); margin: 0; }
+.task-src-btn { margin-right: 0; }

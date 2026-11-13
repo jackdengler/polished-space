@@ -28,6 +28,18 @@ type Block = Extract<Suggestion, { kind: 'calendar_block' }>;
 const isBlock = (s: Suggestion): s is Block => s.kind === 'calendar_block';
 const MIN = 60_000;
 
+/** "45 minutes", "an hour", "an hour and a half", "1 hour 40 minutes", "2 hours". */
+export function durationWords(minutes: number): string {
+  const m = Math.max(0, Math.floor(minutes));
+  if (m < 60) return `${m} minutes`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h === 1 && r === 0) return 'an hour';
+  if (h === 1 && r === 30) return 'an hour and a half';
+  const hours = h === 1 ? '1 hour' : `${h} hours`;
+  return r ? `${hours} ${r} minutes` : hours;
+}
+
 export interface PrioritiseOptions {
   /** Wait this long after a trigger so a burst of changes makes one call. Default 1500 ms. */
   debounceMs?: number;
@@ -40,6 +52,7 @@ export interface PrioritiseOptions {
 export class Prioritiser {
   private lastHash: string | null = null;
   private lastFitKey: string | null = null;
+  private fit: { today: string; taskId: string; sentence: string; meetingId: string; nudgeId: string } | null = null;
   private lastTickBucket: number | null = null;
   private scheduled: { promise: Promise<void>; fire: () => void; timer: NodeJS.Timeout } | null = null;
   private chain: Promise<void> = Promise.resolve();
@@ -109,9 +122,16 @@ export class Prioritiser {
       .filter((t) => !t.done && sectionKeyFor({ dueDate: t.dueDate, onHold: meta[t.id]?.onHold ?? false, clientId: t.clientId }, today, config.internalClientId) === 'today')
       .sort((a, b) => a.id.localeCompare(b.id));
 
+    // Big work due in the next few days can earn a focus block today or soon (Today is only ordered).
+    const soon = addDaysIso(today, 7);
+    const upcoming = tasks
+      .filter((t) => !t.done && t.dueDate && t.dueDate > today && t.dueDate <= soon && !(meta[t.id]?.onHold ?? false) && t.clientId !== config.internalClientId)
+      .sort((a, b) => a.id.localeCompare(b.id));
+
     await this.proposeLunch(now, today, eventsToday);
 
     const gap = gapBeforeNextMeeting(eventsToday, now, tz);
+    this.refreshFitNow(today, gap, todayTasks);
     const stale = Object.values(meta).filter((m) => m.order !== null && !todayTasks.some((t) => t.id === m.taskId));
     if (stale.length) await this.ctx.taskMeta.upsertMany(stale.map((m) => [m.taskId, { order: null }]));
     if (!todayTasks.length) {
@@ -132,12 +152,13 @@ export class Prioritiser {
           events: eventsToday.map((e) => [e.id, e.subject, e.start.dateTime, e.end.dateTime, e.showAs]),
           gap: gap ? [gap.nextMeeting?.id ?? 'end_of_day', Math.floor(gap.minutes / 30)] : null,
           pending: pending.map((s) => [s.id, s.title]),
+          upcoming: upcoming.map((t) => [t.id, t.title, t.dueDate, meta[t.id]?.taskType ?? 'other']),
         }),
       )
       .digest('hex');
     if (hash === this.lastHash) return;
 
-    const req = buildPrioritiseRequest({ now, tz, todayTasks, meta, eventsToday, gap, pending });
+    const req = buildPrioritiseRequest({ now, tz, todayTasks, meta, eventsToday, gap, pending, upcoming });
     let out: PrioritiseOutput;
     try {
       this.calls++;
@@ -153,7 +174,7 @@ export class Prioritiser {
 
     await this.writeOrder(todayTasks, out);
     this.nudgeFitNow(today, gap, todayTasks, out);
-    await this.proposeFocus(now, today, events, todayTasks, out);
+    await this.proposeFocus(now, today, events, [...todayTasks, ...upcoming], out);
   }
 
   /** Claude's order, with unknown ids dropped, duplicates removed and missing tasks appended. */
@@ -172,19 +193,53 @@ export class Prioritiser {
     await this.ctx.taskMeta.upsertMany(entries);
   }
 
+  /**
+   * The time part of the fit-now nudge comes from code (the computed gap), never
+   * from Claude, so "an hour" can never describe a 1h40m gap (D11). Claude's
+   * sentence only says what to work on.
+   */
+  private fitText(gap: Gap, sentence: string): string {
+    const tz = this.ctx.clock.tz;
+    const until = gap.nextMeeting ? `before your ${formatTime(gap.nextMeeting.start, tz)} ${gap.nextMeeting.subject}` : 'before the end of your working day';
+    return `You've got ${durationWords(gap.minutes)} ${until}. ${sentence.trim()}`;
+  }
+
+  /**
+   * Keep the one fit-now nudge true on every run (calendar change, task change,
+   * time passing): gone when there is no gap or its task left Today, re-worded
+   * when the gap changed size (D11).
+   */
+  private refreshFitNow(today: string, gap: Gap | null, todayTasks: PmTask[]): void {
+    const f = this.fit;
+    const nudges = this.ctx.nudges.list().filter((n) => n.kind === 'fit_now');
+    if (!f || !gap || f.today !== today || f.meetingId !== (gap.nextMeeting?.id ?? 'end_of_day') || !todayTasks.some((t) => t.id === f.taskId)) {
+      if (nudges.length) this.ctx.nudges.remove((n) => n.kind === 'fit_now');
+      if (f && (!gap || f.today !== today || f.meetingId !== (gap.nextMeeting?.id ?? 'end_of_day') || !todayTasks.some((t) => t.id === f.taskId))) {
+        this.fit = null;
+        this.lastFitKey = null;
+      }
+      return;
+    }
+    const n = nudges.find((x) => x.id === f.nudgeId);
+    if (n) this.ctx.nudges.retext(n.id, this.fitText(gap, f.sentence));
+  }
+
   private nudgeFitNow(today: string, gap: Gap | null, todayTasks: PmTask[], out: PrioritiseOutput): void {
     const fit = out.fitNow;
     if (!gap || !fit || !fit.sentence.trim() || !todayTasks.some((t) => t.id === fit.taskId)) return;
     const key = `${today}|${fit.taskId}|${gap.nextMeeting?.id ?? 'end_of_day'}`;
-    if (key === this.lastFitKey) return; // same advice for the same gap: do not repeat it
+    if (key === this.lastFitKey && this.fit) return; // same advice for the same gap: do not repeat it
     this.lastFitKey = key;
     const next = gap.nextMeeting;
-    this.ctx.nudges.add({
+    // One fit-now nudge at a time: the new advice replaces the old.
+    this.ctx.nudges.remove((n) => n.kind === 'fit_now');
+    const made = this.ctx.nudges.add({
       kind: 'fit_now',
-      text: fit.sentence.trim(),
+      text: this.fitText(gap, fit.sentence),
       taskId: fit.taskId,
       source: next ? { connector: 'calendar', id: next.id, label: `${next.subject} at ${formatTime(next.start, this.ctx.clock.tz)}` } : null,
     });
+    this.fit = { today, taskId: fit.taskId, sentence: fit.sentence, meetingId: next?.id ?? 'end_of_day', nudgeId: made.id };
   }
 
   // ---- time blocks (suggestions only) ------------------------------------------
@@ -227,7 +282,8 @@ export class Prioritiser {
    * suggestion at a time; not re-suggested for a task whose block is pending,
    * applied or failed, or was denied today, or that already has a focus event.
    */
-  private async proposeFocus(now: Date, today: string, events: CalEvent[], todayTasks: PmTask[], out: PrioritiseOutput): Promise<void> {
+  private async proposeFocus(now: Date, today: string, events: CalEvent[], candidates: PmTask[], out: PrioritiseOutput): Promise<void> {
+    const todayTasks = candidates;
     const fb = out.focusBlock;
     const t = fb && todayTasks.find((x) => x.id === fb.taskId);
     if (!fb || !t) return;

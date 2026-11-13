@@ -94,6 +94,10 @@ export const PATHS = {
     usage: '/api/usage',
     health: '/api/health',
     voice: '/api/voice',
+    /** GET: the original email or chat message behind a source link (SourceMessage), read only. */
+    source: (connector: 'mail' | 'chat', id: string) => `/api/sources/${connector}/${encodeURIComponent(id)}`,
+    /** GET: the one conversation's turns, typed and spoken (ConversationResponse). */
+    conversation: '/api/conversation',
   },
   /** pm-server storage API on PORTS.pmApp (Planr's ServerAdapter, NOT for the brain). */
   pm: {

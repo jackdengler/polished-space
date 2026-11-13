@@ -15,7 +15,7 @@ const TITLES: Record<PreparedWork['type'], string> = {
 };
 
 /** The reviewed file itself, read from the fake file server through the brain. */
-function FileBlock({ path }: { path: string }) {
+export function FileBlock({ path }: { path: string }) {
   const [file, setFile] = useState<FileView | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -156,6 +156,7 @@ export function PreparedView({ taskId }: { taskId: string }) {
   const [regenerating, setRegenerating] = useState(false);
   const [approved, setApproved] = useState<Suggestion | null>(null);
   const [editing, setEditing] = useState(false);
+  const [denied, setDenied] = useState(false);
   const lastTask = useRef<SidebarTask | undefined>(task);
   if (task) lastTask.current = task;
   const shown = task ?? lastTask.current;
@@ -186,9 +187,16 @@ export function PreparedView({ taskId }: { taskId: string }) {
     headingRef.current?.focus();
   }, [taskId]);
 
+  // The task left the open list (approved here, in another tab, or done in Planr): re-read so the
+  // panel can say "Done" rather than "no longer open" when its prepared work was approved (D13).
+  useEffect(() => {
+    if (!task && data) void load();
+  }, [task === undefined]);
+
   const regenerate = async () => {
     setRegenerating(true);
     setApproved(null);
+    setDenied(false);
     try {
       await api.prepare(taskId);
       setData((d) => (d ? { ...d, status: 'preparing' } : d));
@@ -205,6 +213,11 @@ export function PreparedView({ taskId }: { taskId: string }) {
   // Prefer the live suggestion from state (its status changes there).
   const liveSuggestion = useUi((s) => (data?.suggestion ? (s.state?.suggestions.find((x) => x.id === data.suggestion!.id) ?? null) : null));
   const suggestion = liveSuggestion ?? (data?.suggestion && (data.suggestion.status === 'pending' || data.suggestion.status === 'failed') ? data.suggestion : null);
+  // Approved somewhere else (another tab, a double click): the work is done, so say so.
+  const doneElsewhere = !approved && data?.suggestion && (data.suggestion.status === 'applied' || data.suggestion.status === 'approved') ? data.suggestion : null;
+  const shownApproved = approved ?? doneElsewhere;
+  // The draft was denied (here or before a reload): it is discarded, not shown as if still on offer (D13).
+  const isDenied = !suggestion && (denied || data?.suggestion?.status === 'denied');
 
   return (
     <div className="panel" aria-labelledby="pw-heading">
@@ -245,11 +258,11 @@ export function PreparedView({ taskId }: { taskId: string }) {
           </p>
         ) : null}
 
-        {!task && !approved ? <p className="pw-done">This task is no longer open.</p> : null}
+        {!task && !shownApproved ? <p className="pw-done">This task is no longer open.</p> : null}
 
-        {approved ? (
+        {shownApproved ? (
           <div className="pw-done" role="status">
-            <Icon name="check" size={16} /> Done. {approved.kind === 'send_reply' ? 'The email is sent and the task is ticked off.' : 'The task is ticked off.'}
+            <Icon name="check" size={16} /> Done. {shownApproved.kind === 'send_reply' ? 'The email is sent and the task is ticked off.' : 'The task is ticked off.'}
           </div>
         ) : null}
 
@@ -264,7 +277,7 @@ export function PreparedView({ taskId }: { taskId: string }) {
           </div>
         ) : null}
 
-        {!approved && task ? (
+        {!shownApproved && task ? (
           status === 'preparing' || regenerating ? (
             <div className="pw-preparing" role="status" aria-live="polite">
               <span className="spinner big" aria-hidden="true" />
@@ -279,6 +292,13 @@ export function PreparedView({ taskId }: { taskId: string }) {
               <div>
                 <strong>I couldn’t prepare this.</strong> Try again, or work on it directly.
               </div>
+            </div>
+          ) : isDenied ? (
+            <div className="pw-empty" data-denied>
+              <p>You denied this draft, so nothing was sent and the task is still open.</p>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void regenerate()} disabled={offline}>
+                <Icon name="sparkle" size={14} /> Prepare a new draft
+              </button>
             </div>
           ) : status === 'none' || !prepared ? (
             <div className="pw-empty">
@@ -302,9 +322,13 @@ export function PreparedView({ taskId }: { taskId: string }) {
                   slots={prepared.type === 'schedule_meeting' ? prepared.slots : undefined}
                   approveLabel={APPROVE_LABEL[prepared.type]}
                   onEditingChange={setEditing}
+                  pinPayload
                   onDecided={(s) => {
                     if (s.status === 'applied' || s.status === 'approved') setApproved(s);
-                    else if (s.status === 'denied') void load();
+                    else if (s.status === 'denied') {
+                      setDenied(true);
+                      void load();
+                    }
                   }}
                 />
               ) : (

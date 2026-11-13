@@ -18,7 +18,7 @@ const createTask = async (s: Of<'create_task'>, x: ExecContext): Promise<ApplyRe
     assigneeIds: p.assigneeIds.length ? p.assigneeIds : [x.config.me.id],
     ...(p.deliverableId ? { deliverableId: p.deliverableId } : {}),
   });
-  await x.taskMeta.upsert(task.id, { source: s.source, direction: s.direction ?? 'i_owe', taskType: s.taskType ?? 'other' });
+  await x.taskMeta.upsert(task.id, { source: s.source, direction: s.direction ?? 'i_owe', taskType: s.taskType ?? 'other', ...(p.slots?.length ? { meetingSlots: p.slots } : {}) });
   return { taskIds: [task.id], tasksChanged: true, detail: `created task ${task.id}` };
 };
 

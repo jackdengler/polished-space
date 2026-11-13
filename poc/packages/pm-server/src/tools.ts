@@ -12,6 +12,7 @@ import {
   type ListTasksInput,
   type ListTasksOutput,
   type PmTask,
+  isRealIsoDate,
 } from '@poc/contracts';
 import type { Client, Deliverable, Task, Workspace } from '../../../../src/model/schema';
 import { BadRequest } from './store';
@@ -83,10 +84,24 @@ function findTask(ws: Workspace, taskId: string): Located {
   throw new BadRequest(`No task with id "${taskId}".`);
 }
 
+/** Trust-boundary checks shared by the write tools: real dates, known team members. */
+function checkDate(dueDate: string | null | undefined): void {
+  if (dueDate !== null && dueDate !== undefined && !isRealIsoDate(dueDate)) throw new BadRequest(`"${dueDate}" is not a real calendar date (expected YYYY-MM-DD).`);
+}
+
+function checkMembers(ws: Workspace, ids: string[]): void {
+  for (const id of ids) {
+    if (!ws.teamMembers.some((m) => m.id === id)) throw new BadRequest(`No team member with id "${id}".`);
+  }
+}
+
 /** Files the task under `deliverableId`, or the client's Ad-hoc → "General" (created if missing). */
 export function createTask(ws: Workspace, input: CreateTaskInput): PmTask {
   const client = ws.clients.find((c) => c.id === input.clientId);
   if (!client) throw new BadRequest(`No client with id "${input.clientId}".`);
+  if (client.archived) throw new BadRequest(`Client "${client.name}" is archived.`);
+  checkDate(input.dueDate);
+  checkMembers(ws, input.assigneeIds ?? []);
   const t = nowIso();
   let deliverable: Deliverable | undefined;
   if (input.deliverableId !== undefined) {
@@ -123,6 +138,7 @@ export function completeTask(ws: Workspace, taskId: string): PmTask {
 }
 
 export function rescheduleTask(ws: Workspace, taskId: string, dueDate: string | null): PmTask {
+  checkDate(dueDate);
   const hit = findTask(ws, taskId);
   hit.task.dueDate = dueDate;
   hit.task.updatedAt = nowIso();

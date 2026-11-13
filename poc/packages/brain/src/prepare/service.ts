@@ -27,6 +27,7 @@ import { JsonFile } from '../store/jsonFile';
 import { chaseTarget, contactNamed, findFile, gather, mailRef, mailText, mentionedFiles, PrepareError, profileExcerpts, relatedMail, replyTarget, resolvePerson, type Gathered } from './gather';
 import { buildPrepareRequest, OUTPUT_SCHEMAS, type NextStepOut, type PromptFacts } from './prompt';
 import { findMeetingSlots, formatSlot, meetingMinutes } from './slots';
+import { busySpans } from '../prioritise/calendar/gaps';
 
 /** The prepare call is aborted after this long, so a stuck call ends as `failed`, never a hang. */
 export const PREPARE_TIMEOUT_MS = 180_000;
@@ -327,8 +328,13 @@ export class PrepareService {
     const today = c.clock.today();
     const events = await c.read.calendar.view(zonedTime(today, 0, c.clock.tz).toISOString(), zonedTime(addDaysIso(today, 15), 0, c.clock.tz).toISOString());
     const askText = `${g.task.title}\n${replyTo ? mailText(replyTo) : g.sourceText}`;
-    const minutes = meetingMinutes(askText);
-    const candidates = findMeetingSlots(events, { now: c.clock.now(), tz: c.clock.tz, durationMin: minutes }).map((s, i) => ({ id: `t${i + 1}`, slot: s }));
+    const fresh = findMeetingSlots(events, { now: c.clock.now(), tz: c.clock.tz, durationMin: meetingMinutes(askText) });
+    // The times already shown on the suggestion card come first, while they are still free (same busy rule, still ahead).
+    const busy = busySpans(events);
+    const offered = (g.meta.meetingSlots ?? []).filter((s) => Date.parse(s.start) > c.clock.now().getTime() && !busy.some((b) => Date.parse(s.start) < b.end && Date.parse(s.end) > b.start));
+    const pool = offered.length >= 2 ? [...offered, ...fresh.filter((f) => !offered.some((o) => o.start === f.start))] : fresh;
+    const minutes = offered.length >= 2 ? Math.round((Date.parse(offered[0]!.end) - Date.parse(offered[0]!.start)) / 60_000) : meetingMinutes(askText);
+    const candidates = pool.filter((s) => Date.parse(s.end) - Date.parse(s.start) === minutes * 60_000).map((s, i) => ({ id: `t${i + 1}`, slot: s }));
     if (!candidates.length) throw new PrepareError('There is no free time in the next working week for this meeting.');
     const out = await this.call(
       g,
@@ -337,13 +343,13 @@ export class PrepareService {
         `Reply to: ${personLine(to)}.`,
         replyTo ? `Answering the email "${replyTo.subject}".` : 'There is no email to answer; write a short new email proposing a meeting.',
         `Meeting length: ${minutes} minutes.`,
-        `Candidate free times (${c.clock.tz}), computed from the user's calendar:\n${candidates.map((x) => `- ${x.id}: ${formatSlot(x.slot, c.clock.tz)}`).join('\n')}`,
+        `Candidate free times (${c.clock.tz}), computed from the user's calendar${offered.length >= 2 ? `; the first ${offered.length} were already shown to the user on the suggestion, so prefer them` : ''}:\n${candidates.map((x) => `- ${x.id}: ${formatSlot(x.slot, c.clock.tz)}`).join('\n')}`,
       ],
       [...this.threadFor(g, replyTo).map((m) => mailMaterial(m)), ...this.sourceMaterial(g)],
     );
     const byId = new Map(candidates.map((x) => [x.id, x.slot]));
     let chosen = [...new Set(out.slotIds)].flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])).slice(0, 3);
-    if (chosen.length < 2) chosen = candidates.slice(0, 3).map((x) => x.slot);
+    if (chosen.length < 2) chosen = (offered.length >= 2 ? offered : candidates.map((x) => x.slot)).slice(0, 3);
     chosen.sort((a, b) => a.start.localeCompare(b.start));
     const lines = chosen.map((s) => `- ${formatSlot(s, c.clock.tz)} (${c.clock.tz})`).join('\n');
     const body = fillTimes(out.body, lines);

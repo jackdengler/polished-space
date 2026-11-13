@@ -51,6 +51,12 @@ export function taskBullet(e: Pick<TaskEntry, 'title' | 'dueDate' | 'focus' | 'd
   return cleanText(notes.length ? `${e.title} (${notes.join('; ')})` : e.title);
 }
 
+/** Commitment sections are written from approvals only. */
+export function isCommitmentEdit(e: unknown): boolean {
+  const section = (e as { section?: unknown } | null)?.section;
+  return section === 'Commitments: we owe' || section === 'Commitments: they owe';
+}
+
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 export class ProfilesFeature {
@@ -118,8 +124,17 @@ export class ProfilesFeature {
 
   // ---- after triage ----------------------------------------------------------
 
+  /**
+   * Triage may update contacts, projects, preferences and decisions the client
+   * stated. Commitments are NOT taken from triage: a commitment only enters the
+   * profile when the user approves the task (taskCreated), so a denied
+   * suggestion never shows up as something we owe (D3).
+   */
   onTriaged(clientId: string | null, confidence: 'high' | 'low', edits: unknown[], label: string): Promise<void> {
     return this.queue(async () => {
+      const kept = edits.filter((e) => !isCommitmentEdit(e));
+      if (kept.length < edits.length) this.ctx.log(`profile: ${edits.length - kept.length} commitment edit(s) from triage held back until the task is approved`);
+      edits = kept;
       if (!edits.length || confidence !== 'high') return;
       const c = await this.client(clientId);
       if (c) await this.apply(c, edits, label);

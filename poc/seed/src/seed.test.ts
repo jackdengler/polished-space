@@ -163,8 +163,12 @@ describe('writeSeed', () => {
     for (const folder of await readdir(SEED_FILES_DIR)) {
       for (const f of await readdir(join(SEED_FILES_DIR, folder))) expect((await stat(join(dir, 'files', folder, f))).isFile()).toBe(true);
     }
-    // re-seeding over our own folder works
+    // re-seeding over our own folder works, and keeps the Claude cost log (D15)
+    await writeFile(join(dir, 'logs', 'usage.jsonl'), '{"call":"triage"}\n');
+    await writeFile(join(dir, 'logs', 'brain.log'), 'old\n');
     await writeSeed(dir, seed);
+    expect(await readFile(join(dir, 'logs', 'usage.jsonl'), 'utf8')).toBe('{"call":"triage"}\n');
+    expect(await readdir(join(dir, 'logs'))).toEqual(['usage.jsonl']);
   });
 
   it('refuses to wipe a folder that is not a POC data folder', async () => {

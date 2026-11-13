@@ -2,7 +2,7 @@
  * Build the whole seed in memory, then write it to a data folder.
  * `buildSeed` is pure (given now and tz), so tests can check it directly.
  */
-import { cp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -83,9 +83,15 @@ async function assertSafeToReplace(dataDir: string): Promise<void> {
 
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 
-/** Replace `dataDir` with a fresh seed. Brain state and logs start empty. */
+/**
+ * Replace `dataDir` with a fresh seed. Brain state and service logs start
+ * empty. The Claude cost log (`logs/usage.jsonl`) is kept: cost history (and
+ * the daily spend cap) must survive a demo reset (D15).
+ */
 export async function writeSeed(dataDir: string, seed: Seed): Promise<void> {
   await assertSafeToReplace(dataDir);
+  const usagePath = join(dataDir, DATA_LAYOUT.usageLog);
+  const usage = await readFile(usagePath).catch(() => null);
   await rm(dataDir, { recursive: true, force: true });
   const p = (rel: string) => join(dataDir, rel);
   const put = async (rel: string, data: string | Uint8Array) => {
@@ -122,6 +128,7 @@ export async function writeSeed(dataDir: string, seed: Seed): Promise<void> {
   // Empty brain state and logs
   await mkdir(p('brain'), { recursive: true });
   await mkdir(p('logs'), { recursive: true });
+  if (usage) await put(DATA_LAYOUT.usageLog, usage);
 
   await put(DATA_LAYOUT.seedInfo, json(seed.info));
 }

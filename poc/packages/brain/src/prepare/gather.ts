@@ -30,6 +30,8 @@ export interface Gathered {
 }
 
 const INBOX_CAP = 300;
+/** An email to someone is "unanswered" (worth chasing) once it is this old. */
+const QUIET_AFTER_MS = 24 * 3_600_000;
 
 export async function gather(ctx: ModuleContext, taskId: string): Promise<Gathered> {
   const { tasks } = await ctx.read.pm.listTasks({ includeDone: true });
@@ -128,12 +130,16 @@ export async function chaseTarget(ctx: ModuleContext, g: Gathered): Promise<{ to
     ctx.log(`sent folder unavailable: ${(err as Error).message}`);
     return [] as MailMessage[];
   });
-  const lastSent =
-    sent
-      .filter((m) => m.toRecipients.some((r) => r.emailAddress.address.toLowerCase() === addr))
-      .sort((a, b) => (a.sentDateTime ?? a.receivedDateTime).localeCompare(b.sentDateTime ?? b.receivedDateTime))
-      .pop() ?? null;
   const lastFrom = [...g.inbox].reverse().find((m) => m.from.emailAddress.address.toLowerCase() === addr) ?? null;
+  const at = (m: MailMessage) => Date.parse(m.sentDateTime ?? m.receivedDateTime);
+  const toThem = sent.filter((m) => m.toRecipients.some((r) => r.emailAddress.address.toLowerCase() === addr)).sort((a, b) => at(a) - at(b));
+  // "Gone quiet" means an email they have not answered for a while: sent before their latest message
+  // counts as answered, and one sent in the last day is too fresh to chase (D7: a reply the user sent
+  // minutes ago must not become the thing we chase). Fall back to the latest one if nothing qualifies.
+  const now = ctx.clock.now().getTime();
+  const answeredUntil = lastFrom ? Date.parse(lastFrom.receivedDateTime) : -Infinity;
+  const quiet = toThem.filter((m) => at(m) > answeredUntil && now - at(m) >= QUIET_AFTER_MS);
+  const lastSent = quiet.at(-1) ?? toThem.filter((m) => now - at(m) >= QUIET_AFTER_MS).at(-1) ?? toThem.at(-1) ?? null;
   return { to, lastSent, lastFrom };
 }
 

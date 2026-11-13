@@ -140,7 +140,7 @@ export interface ModuleContext {
     upsert(taskId: string, patch: TaskMetaPatch): Promise<TaskMeta>;
     upsertMany(entries: [string, TaskMetaPatch][]): Promise<TaskMeta[]>;
   };
-  nudges: { add(n: NewNudge): Nudge };
+  nudges: { add(n: NewNudge): Nudge; remove(match: (n: Nudge) => boolean): number; retext(id: string, text: string): void; list(): Nudge[] };
   /** Run text through the same triage as typed input (source `manual` or `voice`). */
   intake: { submitText(text: string, connector: 'manual' | 'voice'): Promise<Suggestion[]> };
   state: {

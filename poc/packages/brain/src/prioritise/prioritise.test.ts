@@ -18,7 +18,7 @@ const answer = (over: Partial<PrioritiseOutput> = {}): PrioritiseOutput => ({
     { taskId: 't-reply', quickWin: true, reason: 'Quick reply, Michael is waiting' },
     { taskId: 't-review', quickWin: false, reason: 'Needs a proper run before Monday' },
   ],
-  fitNow: { taskId: 't-reply', sentence: "You've got about an hour and a half before your 3:30pm. Let's get Michael his pricing update." },
+  fitNow: { taskId: 't-reply', sentence: "Let's get Michael his pricing update." },
   focusBlock: null,
   ...over,
 });
@@ -54,7 +54,8 @@ describe('prioritise', () => {
     const user = JSON.stringify(call.params.messages);
     expect(user).toContain('103 minutes');
     expect(user).toContain('Acme Tooling check-in');
-    expect(user).not.toContain('t-later'); // only Today tasks are ordered
+    expect(user.split('Coming up')[0]).not.toContain('t-later'); // only Today tasks are ordered
+    expect(user).toMatch(/Coming up[^]*t-later/); // later work is listed for a focus block only
 
     const state = SidebarState.parse(await h.brain.buildState());
     const today = state.sections.find((s) => s.key === 'today')!;
@@ -83,6 +84,42 @@ describe('prioritise', () => {
     expect(h.claude.calls).toHaveLength(2);
     expect(h.brain.nudges.list().filter((n) => n.kind === 'fit_now')).toHaveLength(1);
     expect(mod.prioritiser()!.calls).toBe(2);
+  });
+
+  it('offers a focus block for big work due in the next few days (not only Today)', async () => {
+    const { h } = await setup(answer({ focusBlock: { taskId: 't-later', minutes: 60 } }));
+    const focus = blocks(h).filter((b) => b.payload.purpose === 'focus');
+    expect(focus).toHaveLength(1);
+    expect(focus[0]!.payload.taskId).toBe('t-later');
+    expect(Date.parse(focus[0]!.payload.end) - Date.parse(focus[0]!.payload.start)).toBe(60 * 60_000);
+  });
+
+  it('D11: the gap wording comes from code, and a calendar change replaces the stale fit-now nudge', async () => {
+    const { h } = await setup();
+    let fit = h.brain.nudges.list().filter((n) => n.kind === 'fit_now');
+    expect(fit.map((n) => n.text)).toEqual(["You've got 1 hour 43 minutes before your 3:30pm Acme Tooling check-in. Let's get Michael his pricing update."]);
+    // A block approved into the gap (14:00-14:30) makes the gap 13 minutes: under the minimum, so the nudge goes.
+    h.calendar.events.push({ ...h.calendar.events[0]!, id: 'evt-lunch', subject: 'Lunch', start: { dateTime: '2026-11-13T14:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: '2026-11-13T14:30:00.0000000', timeZone: 'UTC' } });
+    await h.brain.tick();
+    await h.brain.idle();
+    await new Promise((r) => setTimeout(r, 20));
+    await h.brain.idle();
+    fit = h.brain.nudges.list().filter((n) => n.kind === 'fit_now');
+    expect(fit).toEqual([]);
+  });
+
+  it('D11: when the gap shrinks but stays, the nudge is re-worded in place with the new duration', async () => {
+    const { h } = await setup();
+    const first = h.brain.nudges.list().find((n) => n.kind === 'fit_now')!;
+    h.calendar.events.push({ ...h.calendar.events[0]!, id: 'evt-x', subject: 'Staffing sync', start: { dateTime: '2026-11-13T14:47:00.0000000', timeZone: 'UTC' }, end: { dateTime: '2026-11-13T15:00:00.0000000', timeZone: 'UTC' } });
+    await h.brain.tick();
+    await h.brain.idle();
+    await new Promise((r) => setTimeout(r, 20));
+    await h.brain.idle();
+    const fit = h.brain.nudges.list().filter((n) => n.kind === 'fit_now');
+    expect(fit).toHaveLength(1);
+    expect(fit[0]!.id).not.toBe(first.id); // a new meeting ends the gap: new advice replaces the old
+    expect(fit[0]!.text).toBe("You've got an hour before your 2:47pm Staffing sync. Let's get Michael his pricing update.");
   });
 
   it('does not call Claude again when the input is unchanged', async () => {

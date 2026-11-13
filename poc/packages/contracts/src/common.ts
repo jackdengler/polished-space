@@ -1,7 +1,24 @@
 import { z } from 'zod';
 
-/** Calendar date, `YYYY-MM-DD`. Same rule as Planr's `IsoDate`. */
-export const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
+/** True for a real calendar date in `YYYY-MM-DD` form (rejects 2026-02-30, 2026-13-45, 2026-02-29). */
+export function isRealIsoDate(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  const days = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  return d <= days;
+}
+
+/**
+ * Calendar date, `YYYY-MM-DD`, and a real one: the shape Planr expects, plus a
+ * calendar check (Planr's own schema only checks the shape, so this contract
+ * is the trust boundary for every date the POC writes).
+ */
+export const IsoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
+  .refine(isRealIsoDate, { message: 'is not a real calendar date' });
 
 /**
  * A moment in time, ISO 8601 with an explicit offset or `Z`
@@ -62,3 +79,41 @@ export type Health = z.infer<typeof Health>;
 /** Error body every POC HTTP service returns on a 4xx/5xx. */
 export const ErrorBody = z.object({ error: z.string() });
 export type ErrorBody = z.infer<typeof ErrorBody>;
+
+const FIELD_NAMES: Record<string, string> = {
+  dueDate: 'The due date',
+  start: 'The start time',
+  end: 'The end time',
+  title: 'The title',
+  subject: 'The subject',
+  body: 'The message',
+  to: 'The recipients',
+  cc: 'The cc list',
+  address: 'An email address',
+  assigneeIds: 'The assignee',
+  clientId: 'The client',
+  taskId: 'The task',
+  slots: 'The meeting times',
+};
+
+/**
+ * One plain-English sentence for a zod error, for people (never raw JSON).
+ * e.g. "The due date (2026-02-30) is not a real calendar date."
+ */
+export function humanIssues(error: { issues: readonly { path: readonly PropertyKey[]; message: string; code?: string; input?: unknown }[] }, value?: unknown): string {
+  const parts = error.issues.slice(0, 3).map((i) => {
+    const key = [...i.path].reverse().find((p) => typeof p === 'string') as string | undefined;
+    const field = (key && FIELD_NAMES[key]) || (key ? `"${key}"` : 'The value');
+    let got: unknown = value;
+    for (const p of i.path) got = got && typeof got === 'object' ? (got as Record<PropertyKey, unknown>)[p] : undefined;
+    const shown = typeof got === 'string' && got.length <= 40 ? ` (${got})` : '';
+    let msg = i.message;
+    if (/^Invalid/.test(msg)) msg = got === undefined ? 'is missing' : 'is not valid';
+    else if (/^Too small/.test(msg)) msg = Array.isArray(got) ? 'needs at least one entry' : 'is empty';
+    else if (/^Too big/.test(msg)) msg = Array.isArray(got) ? 'has too many entries' : 'is too long';
+    if (/^[A-Z]/.test(msg) && !/^(The|An|A) /.test(msg)) return msg.endsWith('.') ? msg : `${msg}.`;
+    if (/^(The|An|A) /.test(msg)) return msg.endsWith('.') ? msg : `${msg}.`;
+    return `${field}${shown} ${msg.replace(/^expected /, 'should be ')}${msg.endsWith('.') ? '' : '.'}`;
+  });
+  return [...new Set(parts)].slice(0, 2).join(' ');
+}

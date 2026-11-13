@@ -56,7 +56,7 @@ Your output only ever becomes suggestions that the user approves, edits or denie
    - owed_to_me: things someone else promised to send or do for the user. Title these as something to track, e.g. "Expect updated driver census from Dmitri".
    Task types: reply_email (answer an email or a question), schedule_meeting (someone wants to meet), review_file (read or check a named document), follow_up (chase someone who owes something or has gone quiet), other.
    A message asking for an update and a meeting gives two tasks: a reply_email and a schedule_meeting.
-   Due dates: use YYYY-MM-DD. Resolve "Friday", "by Thursday", "next week" against the current date given in the context ("Friday" means the next Friday after today). If no date is stated or implied, use null. Do not invent dates.
+   Due dates: use YYYY-MM-DD. Resolve "Friday", "by Thursday", "next week" against the current date given in the context ("Friday" means the next Friday after today; on a Friday that is next week's Friday). {{DUE_RULE}}
    Duplicates: if a task repeats an open task or a pending suggestion listed in the context, still list it and set duplicateOf to that item's kind and exact id.
    Chit-chat, thanks and pure FYIs give no tasks.
 
@@ -64,7 +64,15 @@ Your output only ever becomes suggestions that the user approves, edits or denie
 
 4. meetingRequest: true when someone asks to meet or find a time.
 
-5. Profile edits. When the item changes what the client profile should say (a new commitment either way, a decision, a preference, a contact's role, a project's status), propose small edits to the profile sections. Use "add" for a new bullet, "replace" for a bullet whose meaning changed (give the new full bullet), "remove" with the exact existing bullet text. Keep each bullet short and factual. Propose none when nothing changes, and none when the client is uncertain.`;
+5. Profile edits. When the item changes what the client profile should say (a decision the client stated, a preference, a contact's role, a project's status), propose small edits to the profile sections. Do not propose edits to the two Commitments sections: the code records a commitment there only when the user approves the task. Use "add" for a new bullet, "replace" for a bullet whose meaning changed (give the new full bullet), "remove" with the exact existing bullet text. Keep each bullet short and factual. Propose none when nothing changes, and none when the client is uncertain.`;
+
+const DUE_RULE_ON = `Schedule what the user owes: give every i_owe task a due date. A reply or meeting reply someone is waiting on is due today unless the message gives a later date; otherwise pick a sensible date from the message (a stated deadline, or the working day before it for prep). owed_to_me tasks get the date the other person promised, or null.`;
+const DUE_RULE_OFF = `If no date is stated or implied, use null. Do not invent dates.`;
+
+/** The triage instructions; `proposeDueDates` (config, default on) adds the scheduling rule. */
+export function triageSystem(proposeDueDates = true): string {
+  return TRIAGE_SYSTEM.replace('{{DUE_RULE}}', proposeDueDates ? DUE_RULE_ON : DUE_RULE_OFF);
+}
 
 export interface TriageItem {
   kind: 'mail' | 'chat' | 'manual' | 'voice';
@@ -86,6 +94,8 @@ export interface TriageContext {
   profiles: { clientId: string; markdown: string }[];
   openTasks: PmTask[];
   pendingSuggestions: Suggestion[];
+  /** See BrainConfig.proposeDueDates. Default true. */
+  proposeDueDates?: boolean;
 }
 
 /** The roster block: deterministic (sorted, stable keys), so it caches. */
@@ -109,7 +119,7 @@ export function rosterText(me: { name: string; email: string }, clients: PmClien
 
 export function buildTriageRequest(item: TriageItem, ctx: TriageContext): { system: Anthropic.TextBlockParam[]; messages: Anthropic.MessageParam[] } {
   const system: Anthropic.TextBlockParam[] = [
-    { type: 'text', text: TRIAGE_SYSTEM },
+    { type: 'text', text: triageSystem(ctx.proposeDueDates ?? true) },
     { type: 'text', text: rosterText(ctx.me, ctx.clients, ctx.aliases), cache_control: { type: 'ephemeral', ttl: '1h' } },
   ];
   const content: Anthropic.TextBlockParam[] = [];
@@ -146,18 +156,18 @@ export function buildTriageRequest(item: TriageItem, ctx: TriageContext): { syst
  * duplicates must point at something we showed it, and an unknown client
  * means low confidence. Profile edits are kept only for a confident client.
  */
-export function sanitiseTriage(out: TriageOutput, ctx: Pick<TriageContext, 'clients' | 'openTasks' | 'pendingSuggestions'>): TriageOutput {
+export function sanitiseTriage(out: TriageOutput, ctx: Pick<TriageContext, 'clients' | 'openTasks' | 'pendingSuggestions'> & { proposeDueDates?: boolean; today?: string; fromMessage?: boolean }): TriageOutput {
   const clientIds = new Set(ctx.clients.filter((c) => !c.archived).map((c) => c.id));
   const taskIds = new Set(ctx.openTasks.map((t) => t.id));
   const sugIds = new Set(ctx.pendingSuggestions.map((s) => s.id));
   const clientId = out.clientId && clientIds.has(out.clientId) ? out.clientId : null;
   const confidence = clientId ? out.confidence : 'low';
-  const validDate = (d: string | null) => (d && IsoDate.safeParse(d).success && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) ? d : null);
+  const validDate = (d: string | null) => (d && IsoDate.safeParse(d).success ? d : null);
   const tasks = out.tasks
     .map((t) => ({
       ...t,
       title: t.title.trim(),
-      dueDate: validDate(t.dueDate),
+      dueDate: validDate(t.dueDate) ?? (ctx.proposeDueDates && ctx.fromMessage && ctx.today && t.direction === 'i_owe' && (t.taskType === 'reply_email' || t.taskType === 'schedule_meeting') ? ctx.today : null),
       duplicateOf: t.duplicateOf && (t.duplicateOf.kind === 'task' ? taskIds : sugIds).has(t.duplicateOf.id) ? t.duplicateOf : null,
     }))
     .filter((t) => t.title.length > 0)
@@ -176,5 +186,5 @@ export function sanitiseTriage(out: TriageOutput, ctx: Pick<TriageContext, 'clie
 export async function runTriage(claude: Claude, sourceId: string, item: TriageItem, ctx: TriageContext): Promise<TriageOutput> {
   const req = buildTriageRequest(item, ctx);
   const { data } = await claude.parse({ call: 'triage', sourceId }, { ...req, maxTokens: 8000, cacheTtl: '1h' }, TriageOutput);
-  return sanitiseTriage(data, ctx);
+  return sanitiseTriage(data, { ...ctx, fromMessage: item.kind === 'mail' || item.kind === 'chat' });
 }

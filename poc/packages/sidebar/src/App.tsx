@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useUi, type Theme } from './store';
 import { connectBrain, reconnectNow } from './events';
+import { api } from './api';
+import { SourceDialog } from './components/SourceDialog';
 import { arrange } from './derive';
 import { eventEnd, eventStart, time, usd } from './format';
 import { Icon } from './components/Icon';
@@ -161,9 +163,25 @@ export function App() {
 
   useEffect(() => connectBrain(), []);
 
+  // The Chat tab keeps its history across a reload (D10): load the stored conversation once.
+  const chatLoaded = useUi((s) => s.chatLoaded);
+  const loadHistory = useUi((s) => s.loadHistory);
+  useEffect(() => {
+    if (!state || chatLoaded) return;
+    let live = true;
+    api.conversation().then((turns) => live && loadHistory(turns), () => {});
+    return () => {
+      live = false;
+    };
+  }, [state !== null, chatLoaded]);
+
   // Escape closes a panel (when focus is not in a form that handles it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && useUi.getState().sourceOpen) {
+        useUi.getState().openSource(null);
+        return;
+      }
       if (e.key === 'Escape' && useUi.getState().overlay && !e.defaultPrevented) {
         const t = e.target as HTMLElement | null;
         if (t && t.closest('form')) return;
@@ -197,6 +215,7 @@ export function App() {
       </main>
       <Composer />
       <Footer />
+      <SourceDialog />
     </div>
   );
 }

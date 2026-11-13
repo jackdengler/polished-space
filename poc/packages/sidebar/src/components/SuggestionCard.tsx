@@ -14,6 +14,8 @@ const KIND: Record<Suggestion['kind'], { label: string; icon: IconName }> = {
   confirm_client: { label: 'Which client?', icon: 'inbox' },
 };
 
+const NO_CLIENTS: { id: string; name: string }[] = [];
+
 export function useAllTasks(): SidebarTask[] {
   const sections = useUi((s) => s.state?.sections);
   return sections ? sections.flatMap((sec) => sec.items) : [];
@@ -36,28 +38,66 @@ export function ClientTag({ name, low }: { name: string | null; low?: boolean })
   );
 }
 
+/** Sources that can be opened: the original email or chat message, or the client file (D4). */
+export const OPENABLE = new Set(['mail', 'chat', 'files']);
+
 export function SourceChip({ source }: { source: Suggestion['source'] }) {
+  const openSource = useUi((s) => s.openSource);
   if (!source) return null;
+  if (!OPENABLE.has(source.connector)) {
+    return (
+      <span className="chip chip-source" title={source.label}>
+        <Icon name={SOURCE_ICON[source.connector]} size={12} />
+        <span className="chip-text">{source.label}</span>
+      </span>
+    );
+  }
   return (
-    <span className="chip chip-source" title={source.label}>
+    <button
+      type="button"
+      className="chip chip-source chip-link"
+      title={`Open: ${source.label}`}
+      aria-label={`Open the source: ${source.label}`}
+      aria-haspopup="dialog"
+      data-source-connector={source.connector}
+      onClick={(e) => {
+        e.stopPropagation();
+        openSource(source, e.currentTarget);
+      }}
+    >
       <Icon name={SOURCE_ICON[source.connector]} size={12} />
       <span className="chip-text">{source.label}</span>
-    </span>
+    </button>
   );
 }
 
 /** Kind-specific summary shown when not editing. */
 function Details({ s, tasks, variant }: { s: Suggestion; tasks: SidebarTask[]; variant: 'card' | 'prepared' }) {
   const today = useUi((st) => st.state?.today ?? '');
+  const clients = useUi((st) => st.state?.clients) ?? NO_CLIENTS;
   const taskTitle = (id: string) => tasks.find((t) => t.taskId === id)?.title ?? 'a task';
   const [expanded, setExpanded] = useState(false);
   switch (s.kind) {
     case 'create_task':
       return (
-        <p className="sg-detail">
-          {s.payload.dueDate ? <>Due {relativeDue(s.payload.dueDate, today)}</> : 'No date yet: lands in Inbox'}
-          {s.taskType ? <> · {TASK_TYPE_LABEL[s.taskType]}</> : null}
-        </p>
+        <>
+          <p className="sg-detail">
+            {s.payload.dueDate ? <>Due {relativeDue(s.payload.dueDate, today)}</> : 'No date yet: lands in Inbox'}
+            {s.taskType ? <> · {TASK_TYPE_LABEL[s.taskType]}</> : null}
+          </p>
+          {s.payload.slots?.length ? (
+            <>
+              <p className="sg-detail">Times that work for you:</p>
+              <ul className="sg-slots" aria-label="Suggested meeting times" data-card-slots>
+                {s.payload.slots.map((sl) => (
+                  <li key={sl.start}>
+                    <Icon name="calendar" size={12} /> {slotLabel(sl)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </>
       );
     case 'complete_task':
       return variant === 'prepared' ? null : <p className="sg-detail">Mark “{taskTitle(s.payload.taskId)}” as done</p>;
@@ -106,6 +146,12 @@ function Details({ s, tasks, variant }: { s: Suggestion; tasks: SidebarTask[]; v
       return (
         <p className="sg-detail">
           {s.payload.alias ? <>Who is “{s.payload.alias}”? </> : null}
+          {s.payload.candidateClientIds.length === 1 ? (
+            <span className="sg-assign" data-assigns={s.payload.candidateClientIds[0]}>
+              Approve to assign it to <strong>{clients.find((c) => c.id === s.payload.candidateClientIds[0])?.name ?? 'the suggested client'}</strong>
+              {s.payload.alias ? <> and remember “{s.payload.alias}” as its name</> : null}.{' '}
+            </span>
+          ) : null}
           {s.payload.relatedSuggestionIds.length
             ? s.payload.relatedSuggestionIds.length === 1
               ? 'One suggestion waits on this.'
@@ -128,8 +174,6 @@ function Field({ label, children, hint }: { label: string; children: (id: string
     </div>
   );
 }
-
-const NO_CLIENTS: { id: string; name: string }[] = [];
 
 function ClientSelect({ id, value, onChange, only }: { id: string; value: string; onChange: (v: string) => void; only?: string[] }) {
   const clients = useUi((s) => s.state?.clients) ?? NO_CLIENTS;
@@ -224,14 +268,13 @@ function EditFields({
       return (
         <>
           <Field label="Name">{(id) => <input id={id} ref={ref} className="text-input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />}</Field>
-          <div className="field-row">
-            <Field label="Starts">
-              {(id) => <input id={id} type="datetime-local" className="text-input" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />}
-            </Field>
-            <Field label="Ends">
-              {(id) => <input id={id} type="datetime-local" className="text-input" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />}
-            </Field>
-          </div>
+          {/* One per row: side by side, a datetime field is too narrow at sidebar width to show AM/PM (D13). */}
+          <Field label="Starts">
+            {(id) => <input id={id} type="datetime-local" className="text-input" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />}
+          </Field>
+          <Field label="Ends">
+            {(id) => <input id={id} type="datetime-local" className="text-input" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />}
+          </Field>
         </>
       );
     case 'send_reply': {
@@ -312,10 +355,16 @@ export interface SuggestionProps {
   approveLabel?: string;
   onDecided?: (s: Suggestion) => void;
   onEditingChange?: (editing: boolean) => void;
+  /**
+   * Approve exactly the payload on screen (prepared drafts): if the brain revised
+   * the suggestion a moment ago (a regenerate), what is sent is still what the
+   * user saw and approved.
+   */
+  pinPayload?: boolean;
 }
 
 /** Approve / Edit / Deny for one suggestion, with its edit form. Used by cards and prepared work. */
-export function SuggestionActions({ suggestion: s, slots, approveLabel, onDecided, onEditingChange }: SuggestionProps) {
+export function SuggestionActions({ suggestion: s, slots, approveLabel, onDecided, onEditingChange, pinPayload }: SuggestionProps) {
   const tasks = useAllTasks();
   const inFlight = useUi((st) => st.inFlight[s.id]);
   const error = useUi((st) => st.decisionErrors[s.id]);
@@ -348,6 +397,8 @@ export function SuggestionActions({ suggestion: s, slots, approveLabel, onDecide
         return;
       }
       edits = r.edits;
+    } else if (decision === 'approve' && pinPayload && s.kind === 'send_reply') {
+      edits = { payload: { draft: s.payload.draft } };
     }
     setFormError(null);
     const ok = await decide(s.id, decision, edits);

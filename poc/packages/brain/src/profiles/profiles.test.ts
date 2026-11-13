@@ -35,12 +35,13 @@ describe('profiles module', () => {
     await h.brain.idle();
 
     const md = await read('acme-tooling-co');
-    expect(sectionBullets(md, 'Commitments: we owe')).toEqual(['Pricing update to Michael']);
+    // D3: commitments wait for an approval; the preference lands now.
+    expect(sectionBullets(md, 'Commitments: we owe')).toEqual([]);
     expect(sectionBullets(md, 'Preferences and quirks')).toEqual(['Michael wants 45-minute meetings']);
     expect(md).toContain('- Lena Hartwell: added by hand, keep me');
     const log = sectionBullets(md, 'Change log');
-    expect(log).toHaveLength(2);
-    expect(log[0]).toMatch(new RegExp(`^${NOW.replace(/[.]/g, '\\.')}: added to Commitments: we owe: "Pricing update to Michael" \\(source: Email from Michael Okafor: `));
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatch(new RegExp(`^${NOW.replace(/[.]/g, '\\.')}: added to Preferences and quirks: "Michael wants 45-minute meetings" \\(source: Email from Michael Okafor: `));
 
     // A hand edit made now survives the next update too.
     await writeFile(file('acme-tooling-co'), md.replace('## Recent decisions\n\n- (none yet)', '## Recent decisions\n\n- Hand-written decision'));
@@ -51,6 +52,21 @@ describe('profiles module', () => {
     const md2 = await read('acme-tooling-co');
     expect(sectionBullets(md2, 'Recent decisions')).toEqual(['Hand-written decision', 'Effective date stays 1 January']);
     expect(md2).toContain('- Lena Hartwell: added by hand, keep me');
+  });
+
+  it('D3: denied suggestions never appear as commitments; an approved one does', async () => {
+    const { h, read } = await setup();
+    h.claude.enqueue({ parsed: triage({ profileEdits: [{ section: 'Commitments: we owe', op: 'add', text: 'Reply to Michael with a pricing update' }, { section: 'Commitments: we owe', op: 'add', text: 'Set up a 45-minute call with Michael' }] }) });
+    h.mail.deliver(michaelMail);
+    await h.brain.tick();
+    await h.brain.idle();
+    const [reply, meeting] = [pending(h).find((s) => s.taskType === 'reply_email')!, pending(h).find((s) => s.taskType === 'schedule_meeting')!];
+    await h.brain.deny(meeting.id);
+    await h.brain.approve(reply.id);
+    await h.brain.idle();
+    const we = sectionBullets(await read('acme-tooling-co'), 'Commitments: we owe');
+    expect(we).toEqual(['Reply to Michael with a pricing update (due 2026-11-16)']);
+    expect(we.join('\n')).not.toMatch(/45-minute/);
   });
 
   it('approving a task that triage already noted updates that line instead of adding a twin', async () => {
@@ -137,7 +153,7 @@ describe('profiles module', () => {
     await h.brain.approve(meeting!.id, {});
     await h.brain.idle();
     let md = await read('acme-tooling-co');
-    expect(sectionBullets(md, 'Commitments: we owe')).toEqual(['Reply to Michael with a pricing update (due 2026-11-16)', 'Set up a 45-minute call with Michael']);
+    expect(sectionBullets(md, 'Commitments: we owe')).toEqual(['Reply to Michael with a pricing update (due 2026-11-16)', 'Set up a 45-minute call with Michael (due 2026-11-13)']);
     const taskId = h.pm.tasks.find((t) => t.title.startsWith('Reply to Michael'))!.id;
 
     const resched = await h.brain.suggestions.add({ kind: 'reschedule_task', title: 'Move the reply to Tuesday', nudge: '', clientId: 'poc-client-acme', clientConfidence: 'high', source: null, payload: { taskId, dueDate: '2026-11-17' } });
@@ -178,7 +194,7 @@ describe('profiles module', () => {
     expect(usage.trim().split('\n').map((l) => JSON.parse(l).call)).toContain('profile');
 
     md = await read('acme-tooling-co');
-    expect(sectionBullets(md, 'Commitments: we owe')).toEqual(['Reply to Michael with a pricing update (done 2026-11-13)', 'Set up a 45-minute call with Michael', 'Send the full pricing deck by 2026-11-20']);
+    expect(sectionBullets(md, 'Commitments: we owe')).toEqual(['Reply to Michael with a pricing update (done 2026-11-13)', 'Set up a 45-minute call with Michael (due 2026-11-13)', 'Send the full pricing deck by 2026-11-20']);
     const log = sectionBullets(md, 'Change log');
     expect(log.filter((l) => l.startsWith(NOW))).toHaveLength(6);
     // Only the approved actions wrote outside: never the profile updates.

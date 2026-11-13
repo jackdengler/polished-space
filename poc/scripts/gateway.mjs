@@ -35,13 +35,21 @@ function proxy(req, res, target, log) {
       res.writeHead(r.statusCode ?? 502, r.headers);
       res.flushHeaders?.();
       r.pipe(res);
+      // If the upstream dies mid-response (a long-lived SSE stream when the brain is killed), end the
+      // browser's side too, so it notices at once instead of holding a silent stream open (D2).
+      r.on('aborted', () => res.destroy());
+      r.on('error', () => res.destroy());
+      r.on('close', () => {
+        if (!r.complete && !res.destroyed) res.destroy();
+      });
     },
   );
   up.on('error', (e) => {
     log?.(`proxy ${req.method} ${req.url} -> ${target.port} failed: ${e.code ?? e.message}`);
     if (!res.headersSent) {
+      // A sentence for people, plus a code the sidebar can recognise; never the port or a socket error.
       res.writeHead(502, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: `upstream on port ${target.port} is not answering` }));
+      res.end(JSON.stringify({ error: 'The service is not answering right now. Nothing was changed; try again in a moment.', code: 'upstream_down' }));
     } else res.destroy();
   });
   res.on('close', () => up.destroy());

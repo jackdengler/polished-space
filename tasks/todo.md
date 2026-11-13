@@ -835,13 +835,13 @@ Builders use `model: opus`, one focused piece each. **Phase 0 must finish first.
 
 ### Phase 4: Independent verification
 
-- [ ] A separate `model: opus` agent that built nothing runs section 8 from a clean `poc:reset` and reports failures. Fix root causes, then verify again.
+- [x] A separate `model: opus` agent that built nothing runs section 8 from a clean `poc:reset` and reports failures. Fix root causes, then verify again.
 - [ ] Human pass on the items marked "human" in section 8.
 
 ### Phase 5: Write-up
 
-- [ ] Add a Review section here: what works, what doesn't, measured cost per message, measured voice latency, what to do next.
-- [ ] Add any user corrections to `tasks/lessons.md`.
+- [x] Add a Review section here: what works, what doesn't, measured cost per message, measured voice latency, what to do next.
+- [x] Add any user corrections to `tasks/lessons.md`.
 
 ---
 
@@ -923,3 +923,59 @@ Each has a recommended answer. The build can start on the recommendations if you
 11. **Where the POC code lives.** This repo is public. **Recommend:** `poc/` on this branch, invented data only, not merged to `main` until you say so.
 12. **Users and delegation.** **Recommend:** one user ("Alex Rivera") and no delegation in the POC.
 13. **Client contracts and cloud AI** (from the brief). Not blocking: the POC only ever sends invented data to Claude. It must be answered before V1.
+
+---
+
+## 12. Review (AI Work Assistant POC)
+
+Status: **built and verified with a scripted stand-in for Claude. Not yet run with live Claude, in Docker, or with a real microphone.** Those three need the work laptop.
+
+### What works (proven here)
+
+- Everything in the brief's sandbox table is built under `poc/`. Planr changed in 11 files (four optional client fields and a server storage adapter behind `?storage=server`).
+- `poc/e2e/demo.mjs` walks all 11 demo steps through the real sidebar, the Planr test copy and the control page: 54 checks, passed three runs in a row, then once more when re-run by the lead. 626 POC tests and Planr's own 103 tests, typecheck, build and browser check pass.
+- Approval is structural. Every write to Planr, the mailbox or the calendar throws unless it runs inside an approved suggestion. An independent verifier compared the MCP call log with approvals one for one and found no unapproved write. An email telling the assistant to "mark all tasks complete" caused no action.
+- The MCP server exposes exactly five tools. The test server refuses to start without the sandbox marker file.
+- Speech runs on local models with no outside network connection. On this machine: first audio 33–272 ms after text is ready; interruption 405–454 ms from the start of the interrupting speech.
+
+### What the independent verification found, and what was done
+
+An Opus agent that built nothing walked the demo itself. It found 15 defects and several gaps against the brief. All were fixed, each with a regression test, and the demo check was strengthened to cover them. The main ones:
+
+| Finding | Fix |
+|---|---|
+| Impossible dates and unknown assignees could reach Planr | Real date validation in the shared contract; member checks in the MCP tools; approve returns 400 with a plain sentence |
+| Sidebar showed "Connected" with the brain down | Heartbeat every 3 s; "Connection lost" after 8 s; gateway closes dead streams |
+| Denied suggestions stayed in the profile as commitments | Commitments enter a profile only when the task is approved |
+| Source links were labels only | Source chips open the original email, chat message or file |
+| No next step after meeting and follow-up tasks | Prompt now covers every task type |
+| Meeting times only appeared after approval | Times are computed at suggestion time and shown on the card |
+| Approved tasks were undated, so Today did not reorder | Claude proposes a due date for every task the user owes (off with `POC_TRIAGE_DUE_DATES=0`) |
+| A message with nothing to act on vanished silently | It now gets an "FYI" nudge with its source |
+
+The fixes were re-checked by the lead (full test run, demo check, screenshots). A second independent agent pass was not run.
+
+### What is not proven
+
+- **Live Claude.** Never run: no API key could be supplied in the cloud build session. Tagging accuracy, both-direction extraction, duplicate detection, draft quality, Today ordering, real cost per message, cache hits and voice response time with a real model are all unknown. `npm --prefix poc run e2e:live` is ready. Some of its checks may fail on reasonable choices by Claude.
+- **Docker.** No daemon in the build session. The images have never been built, `up` has never run, and `poc/scripts/check-isolation.sh` has never run. The nginx gateway config is unverified.
+- **Real microphone and speakers.** Voice was tested with a recorded clip and Chromium's fake microphone only. The speech model hears "Add a task" as "At the task". Names are a likely weak spot.
+- **Interruption timing under load.** The verifier measured 351–1481 ms on a busy machine; the fix builder could not reproduce the slow runs and changed no speech code. Expect it to vary with CPU load.
+- **Cost figures** use a cached price table. Check the live pricing page before quoting them.
+
+### Deliberate deviations from the brief
+
+- Dated typed or spoken tasks go to their day, not to Inbox.
+- An extra "Later" section holds tasks beyond Next week +2.
+- "On hold", "Internal" and source links live in the assistant's own data, not in Planr.
+- Dismissing a nudge is remembered in the browser only.
+- The sidebar is a browser window at sidebar width, not a desktop shell.
+
+### What to do next
+
+1. On the laptop: confirm Docker with IT, run `up`, then `check-isolation.sh`.
+2. Add the API key to `poc/.env` and run `e2e:live`. Tune the triage, prepare and chat prompts on the seed messages (plan item 3.6).
+3. Do the human pass: read the nudges and drafts, say the voice task into a real microphone, interrupt it out loud on speakers and on a headset.
+4. Review before V1: the speech engine bundles a GPL-3.0 component; client contracts and cloud AI.
+
+Open plan items: 3.2 and 3.3 (Docker), 3.5 and 3.6 (live Claude), and the human pass.

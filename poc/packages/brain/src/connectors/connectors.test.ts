@@ -96,7 +96,13 @@ describe('GraphMailConnector', () => {
 
   it('surfaces HTTP errors', async () => {
     const base = await serve((_q, res) => json(res, 500, { error: 'boom' }));
-    await expect(new GraphMailConnector(base).listSince('')).rejects.toThrow(/500/);
+    await expect(new GraphMailConnector(base).listSince('')).rejects.toMatchObject({ status: 500, message: 'The mail service said: boom.' });
+    const bare = await serve((_q, res) => {
+      res.writeHead(503);
+      res.end('<html>down</html>');
+    });
+    await expect(new GraphMailConnector(bare).listSince('')).rejects.toMatchObject({ message: 'The mail service answered with an error (503).' });
+    await expect(new GraphMailConnector('http://127.0.0.1:9').listSince('')).rejects.toThrow(/^The mail service is not answering \(/);
   });
 });
 

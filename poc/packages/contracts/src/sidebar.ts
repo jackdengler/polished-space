@@ -159,7 +159,41 @@ export type SidebarState = z.infer<typeof SidebarState>;
 export const BRAIN_SSE_EVENTS = {
   state: SidebarState,
   nudge: Nudge,
+  /** Sent every HEARTBEAT_MS so the sidebar can tell a live stream from a silent, dead one. */
+  heartbeat: z.object({ now: IsoDateTime }),
 } as const;
+
+/** The brain sends a heartbeat this often; the sidebar calls the connection lost after HEARTBEAT_TIMEOUT_MS of silence. */
+export const HEARTBEAT_MS = 3_000;
+export const HEARTBEAT_TIMEOUT_MS = 8_000;
+
+/** `GET /api/sources/:connector/:id`: the original message behind a source link. Read only; the body is untrusted text. */
+export const SourceMessage = z.object({
+  connector: z.enum(['mail', 'chat']),
+  id: z.string(),
+  from: z.object({ name: z.string(), address: z.string() }),
+  /** Mail recipients, or the chat channel / "personal chat". */
+  to: z.array(z.string()),
+  at: IsoDateTime,
+  subject: z.string().nullable(),
+  body: z.string(),
+  truncated: z.boolean(),
+});
+export type SourceMessage = z.infer<typeof SourceMessage>;
+
+/** `GET /api/conversation`: the one conversation, oldest first (typed and spoken turns). */
+export const ConversationTurn = z.object({
+  id: z.string(),
+  at: IsoDateTime,
+  via: z.enum(['text', 'voice']),
+  user: z.string(),
+  assistant: z.string(),
+  interrupted: z.boolean(),
+  suggestionIds: z.array(z.string()),
+});
+export type ConversationTurn = z.infer<typeof ConversationTurn>;
+export const ConversationResponse = z.object({ turns: z.array(ConversationTurn) });
+export type ConversationResponse = z.infer<typeof ConversationResponse>;
 
 /** `POST /api/chat` body; the response is an SSE stream of CHAT_SSE_EVENTS. */
 export const ChatBody = z.object({ text: z.string().trim().min(1) });

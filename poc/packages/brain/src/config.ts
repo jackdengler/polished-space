@@ -40,6 +40,12 @@ export interface BrainConfig {
   internalClientId: string | null;
   /** Where mail and chat intake start when no cursor is stored yet. */
   intakeCursor: string;
+  /**
+   * Triage proposes a due date for every task the user owes (a reply someone
+   * is waiting on defaults to today). POC_TRIAGE_DUE_DATES=0 switches it off
+   * (tasks with no stated date then stay undated, in Inbox). Default on.
+   */
+  proposeDueDates?: boolean;
 }
 
 /** The default Claude endpoint when POC_CLAUDE_BASE_URL is not set. */
@@ -101,6 +107,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BrainConfig {
     maxUsdPerDay: num(env[ENV.maxUsdPerDay], 5),
     pollMs: num(env.POC_POLL_MS, 2500),
     claudeFallbacks: env.POC_CLAUDE_FALLBACKS !== '0',
+    proposeDueDates: env.POC_TRIAGE_DUE_DATES !== '0',
     me: seed?.me ?? { id: 'poc-member-alex', name: 'Alex Rivera', email: 'alex.rivera@brightline-advisory.example' },
     internalClientId: seed?.internalClientId ?? null,
     intakeCursor: seed?.intakeCursor ?? clock.now().toISOString(),

@@ -86,3 +86,43 @@ export function formatSlot(s: TimeSlot, tz: string): string {
   const time = (iso: string) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
   return `${day}, ${time(s.start)}-${time(s.end)}`;
 }
+
+const WEEKDAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+/**
+ * The best `n` candidates for what the requester asked (named weekdays,
+ * "morning"/"afternoon", "next week"), in code, earliest first. Used for the
+ * times shown on a schedule-meeting suggestion card before anything is
+ * prepared; prepared work then reuses them.
+ */
+export function preferredSlots(candidates: TimeSlot[], askText: string, tz: string, today: string, n = 3): TimeSlot[] {
+  const t = askText.toLowerCase();
+  const days = WEEKDAY_NAMES.filter((d) => new RegExp(`\\b${d}s?\\b`).test(t));
+  const nextWeek = /\bnext week\b/.test(t);
+  const nextMon = addDaysIso(today, 7 - weekdayIndex(today));
+  const score = (s: TimeSlot) => {
+    const d = new Date(s.start);
+    const day = localDate(d, tz);
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(d));
+    let v = 0;
+    if (days.includes(WEEKDAY_NAMES[weekdayIndex(day)] ?? '')) v += 4;
+    if (nextWeek && day >= nextMon && day < addDaysIso(nextMon, 7)) v += 2;
+    if (/afternoon/.test(t) && hour >= 12) v += 1;
+    if (/morning/.test(t) && hour < 12) v += 1;
+    return v;
+  };
+  const ranked = candidates.map((s, i) => ({ s, i, v: score(s) })).sort((a, b) => b.v - a.v || a.i - b.i);
+  // One per day where possible, so the options really differ.
+  const out: TimeSlot[] = [];
+  const usedDays = new Set<string>();
+  const top = ranked[0]?.v ?? 0;
+  for (const r of ranked) {
+    const day = localDate(new Date(r.s.start), tz);
+    if (r.v < top || usedDays.has(day)) continue;
+    usedDays.add(day);
+    out.push(r.s);
+    if (out.length === n) break;
+  }
+  for (const r of ranked) if (out.length < n && !out.includes(r.s)) out.push(r.s);
+  return out.sort((a, b) => a.start.localeCompare(b.start));
+}

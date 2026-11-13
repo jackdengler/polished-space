@@ -3,6 +3,7 @@
  * upgrade dispatch. Plain node:http, JSON in and out, `{ error }` on failure.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { HEARTBEAT_MS } from '@poc/contracts';
 import { HttpProblem } from './httpProblem';
 import type { Registry } from './modules/registry';
 import type { RouteRequest } from './modules/types';
@@ -46,9 +47,11 @@ export class SseHub {
   private keepAlive: NodeJS.Timeout;
 
   constructor() {
+    // A named event (not a comment) so the browser's EventSource sees it: the sidebar treats
+    // HEARTBEAT_TIMEOUT_MS of silence as "connection lost" (D2), whatever proxies sit in between.
     this.keepAlive = setInterval(() => {
-      for (const c of this.clients) c.write(': keep-alive\n\n');
-    }, 15_000);
+      for (const c of this.clients) this.send(c, 'heartbeat', { now: new Date().toISOString() });
+    }, HEARTBEAT_MS);
     this.keepAlive.unref();
   }
 

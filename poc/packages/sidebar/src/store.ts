@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ApproveBody, Nudge, SidebarState, Suggestion } from '@poc/contracts';
+import type { ApproveBody, ConversationTurn, Nudge, SidebarState, SourceRef, Suggestion } from '@poc/contracts';
 import { api, ApiError, streamChat } from './api';
 
 export type Connection = 'connecting' | 'live' | 'lost';
@@ -39,8 +39,14 @@ export interface UiStore {
   /** Nudges that arrived by the `nudge` SSE event and are not yet in a state snapshot. */
   liveNudges: Nudge[];
   theme: Theme;
+  /** The source message open in the source dialog (D4), and the element to give focus back to. */
+  sourceOpen: { source: SourceRef; returnTo: HTMLElement | null } | null;
+  /** True once the stored conversation has been loaded into `chat` (D10). */
+  chatLoaded: boolean;
 
   setState(s: SidebarState): void;
+  openSource(source: SourceRef | null, returnTo?: HTMLElement | null): void;
+  loadHistory(turns: ConversationTurn[]): void;
   addNudge(n: Nudge): void;
   setConnection(c: Connection): void;
   setTab(t: 'list' | 'chat'): void;
@@ -113,6 +119,25 @@ export const useUi = create<UiStore>()((set, get) => ({
   decided: {},
   liveNudges: [],
   theme: readJson<Theme>(THEME_KEY, 'system'),
+  sourceOpen: null,
+  chatLoaded: false,
+
+  openSource(source, returnTo = null) {
+    const prev = get().sourceOpen;
+    set({ sourceOpen: source ? { source, returnTo } : null });
+    if (!source) requestAnimationFrame(() => prev?.returnTo?.focus());
+  },
+  loadHistory(turns) {
+    set((st) => {
+      if (st.chatLoaded) return st;
+      const old: ChatMessage[] = turns.flatMap((t) => [
+        { id: `${t.id}-u`, role: 'user' as const, text: t.user, via: t.via, suggestions: [], status: 'done' as const },
+        { id: `${t.id}-a`, role: 'assistant' as const, text: t.assistant, via: t.via, suggestions: (st.state?.suggestions ?? []).filter((x) => t.suggestionIds.includes(x.id)), status: t.interrupted ? ('interrupted' as const) : ('done' as const) },
+      ]);
+      // Keep anything said in this session before the history arrived, after it.
+      return { chat: [...old, ...st.chat], chatLoaded: true };
+    });
+  },
 
   setState(s) {
     const known = new Set(s.nudges.map((n) => n.id));

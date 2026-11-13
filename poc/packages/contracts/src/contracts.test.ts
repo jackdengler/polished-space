@@ -144,3 +144,15 @@ describe('usage', () => {
     expect(c.UsageSummary.parse(s)).toEqual(s);
   });
 });
+
+describe('D1: IsoDate is a real calendar date (every user of the contract benefits)', () => {
+  it('rejects impossible dates and keeps real ones, leap years included', async () => {
+    const { IsoDate, CreateTaskPayload, RescheduleTaskInput, humanIssues } = await import('./index');
+    for (const bad of ['2026-02-30', '2026-13-45', '2026-02-29', '2026-04-31', '2026-00-10', '2026-11-00']) expect(IsoDate.safeParse(bad).success, bad).toBe(false);
+    for (const ok of ['2026-11-13', '2028-02-29', '2000-02-29', '2026-12-31']) expect(IsoDate.safeParse(ok).success, ok).toBe(true);
+    expect(RescheduleTaskInput.safeParse({ taskId: 't', dueDate: '2026-13-45' }).success).toBe(false);
+    const r = CreateTaskPayload.safeParse({ title: 'x', dueDate: '2026-02-30' });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(humanIssues(r.error, { title: 'x', dueDate: '2026-02-30' })).toBe('The due date (2026-02-30) is not a real calendar date.');
+  });
+});

@@ -37,7 +37,8 @@ done for every workspace package).
 
 **General**
 
-- Every timestamp the POC owns is ISO 8601 with an offset or `Z` (`IsoDateTime`). Dates are `YYYY-MM-DD`.
+- Every timestamp the POC owns is ISO 8601 with an offset or `Z` (`IsoDateTime`). Dates are `YYYY-MM-DD` and must be real calendar dates (`IsoDate` refines the shape with `isRealIsoDate`: 2026-02-30 and 2026-13-45 are refused everywhere the contract is used, including the MCP tool inputs).
+- `humanIssues(zodError, value)` turns a validation error into one plain sentence ("The due date (2026-02-30) is not a real calendar date."). Approve errors use it; no raw zod JSON reaches people.
 - "Now" is `POC_NOW` if set, else the clock (`resolveNow`). The working day is in one IANA zone, `POC_TZ` (default `UTC`); compose passes it to every container (also as `TZ`). Weeks run Monday to Sunday.
 - Error bodies are `{ error: string }`. Health endpoints return `{ ok, service, now }`. Extra health paths: `PATHS.pm.health`, `PATHS.control.health`, `PATHS.speech.health` (the brain's is in the plan).
 
@@ -50,7 +51,7 @@ done for every workspace package).
 - Zoom: real Zoom lists one conversation at a time and needs `to_contact` or `to_channel`. The mock accepts just `from` and returns all of the user's chats, oldest first. In a 1:1 chat, `to_contact` is the *other* person (as seen from "me"). `channel_name` is a mock-only extra for labels. Messages sent by "me" appear too; the brain skips them.
 - Cursor rule for `listSince`: opaque string, `''` = from the start, returns items strictly after the cursor, oldest first. The POC uses the last item's timestamp. `/_control/mail` always stamps a dropped message later than the newest stored one, so `gt` never misses it.
 - Sent folder: `MailConnector.listSent()` reads Graph `GET /v1.0/me/mailFolders/sentitems/messages` (oldest first). Read only; the brain uses it to quote the unanswered email in a follow-up chaser.
-- Extra control endpoints: `GET /_control/canned` (the canned messages) and `GET /_control/sent` (the Sent folder), for the control page and e2e.
+- Extra control endpoints: `GET /_control/canned` (the canned messages) and `GET /_control/sent` (the Sent folder), for the control page and e2e. `POST /_control/fail-next { target: 'calendar' | 'mail' }` makes the next write to that service answer 503 (a simulated outage, for the failed-action path).
 - `FileContent`: text types are `utf8`, PDFs are `base64` (ready for a Claude document block). Only `.txt`, `.md`, `.csv`, `.pdf` exist.
 - `GET /api/files?path=` (brain, read only) returns `FileView`: the file's info plus its text (`textSource: 'file'`), or for a PDF the text taken from its content streams (`'pdf_text'`, layout not kept), capped at `FILE_VIEW_MAX_CHARS`, and `rawUrl` = `GET /api/files/raw?path=` which serves the file itself (PDF inline). Paths outside the fake file server are a 400. The sidebar shows it in the file-review view.
 
@@ -67,6 +68,9 @@ done for every workspace package).
 - `duplicateOf` is an object `{ kind: 'task' | 'suggestion', id }` (the plan had a bare string, which could not say which).
 - `ApproveBody.edits`: `title`, `clientId`, and `payload` (shallow-merged over the suggestion's payload, then re-validated; 400 if invalid). For `send_reply`, pass the whole edited draft as `payload.draft`.
 - `send_reply` completes `payload.taskId` (if set) after the send succeeds.
+- Approve answers **400** (suggestion unchanged, nothing written) for invalid edits and when Planr refuses a task action's input (unknown member, task or deliverable). A real outage of an outside service still marks the suggestion `failed` with a readable reason.
+- `CalendarBlockPayload` requires end after start (max 12 h); `MailDraft` requires 1-10 valid recipients, no address twice, a subject and a body.
+- `CreateTaskPayload.slots` (optional): for a schedule-meeting suggestion, candidate times computed in code at suggestion time and shown on the card; approving copies them to `TaskMeta.meetingSlots`, and prepared work reuses them while still free.
 - `confirm_client`: approve needs `edits.clientId` (or exactly one candidate). The brain then sets that client on `relatedSuggestionIds` (still pending) and records `alias` under "Also known as" in that client's profile.
 - **Approving prepared work** goes through the same approve endpoint: when prepared work is ready, the brain also creates one pending suggestion for it (`send_reply` for reply, meeting and follow-up drafts; `complete_task` for file review and "other") and stores its id in `TaskMeta.preparedSuggestionId`. The plan listed no endpoint for this; this keeps exactly one write path.
 - A follow-on "next step" suggestion has `source.connector = 'next_step'` and `source.id` = the task whose prepared work was approved. (`next_step` is added to the plan's connector list.)
@@ -81,6 +85,10 @@ done for every workspace package).
 - `SidebarState` also carries `today`, `me` and `clients` (for the client picker). `suggestions` holds pending and failed only, newest first. `nudges` newest first, at most 20. Every section is present even when empty.
 - `Nudge.kind`: `new_item`, `fit_now` (with `taskId`), `info`.
 - The brain's Claude endpoint is `POC_CLAUDE_BASE_URL` (`ENV.claudeBaseUrl`; default `https://api.anthropic.com`; compose sets the gateway). The brain never reads `ANTHROPIC_BASE_URL`.
+- `GET /api/events` also sends `heartbeat` every `HEARTBEAT_MS` (3 s); the sidebar calls the connection lost after `HEARTBEAT_TIMEOUT_MS` (8 s) of silence.
+- `GET /api/sources/:connector/:id` (`PATHS.brain.source`, `mail` or `chat`) returns `SourceMessage`, the original message behind a source link, read only. File sources open in the file view (`/api/files`).
+- `GET /api/conversation` returns `ConversationResponse` (the stored turns, typed and spoken, with `interrupted`), so the Chat tab survives a reload.
+- Nudges are persisted in `data/brain/nudges.json`. A client message that yields no suggestion still gets an `info` nudge starting "FYI:" with its source.
 - `POST /api/input` responds `{ suggestions }`. `GET /api/usage` responds `{ today, days }`. `GET /api/profiles` responds `{ profiles }`.
 
 **Voice**

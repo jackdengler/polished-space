@@ -37,6 +37,8 @@ const SIDEBAR_DIR = join(POC_DIR, 'packages/sidebar');
 
 export const PORTS = { pmApp: 8080, pmMcp: 8081, mocks: 8090, speech: 7100, brain: 7000, sidebar: 5180, pm: 5181, control: 5182 };
 export const PUBLIC_CLAUDE_URL = 'https://api.anthropic.com';
+/** Where `--claude-standin` runs the scripted stand-in (its own process, loopback only). */
+const STANDIN_PORT = 7999;
 
 const HEALTH = [
   ['speech', `http://127.0.0.1:${PORTS.speech}/health`],
@@ -78,9 +80,9 @@ function portInUse(port) {
   });
 }
 
-async function waitHealthy(timeoutMs, procs) {
+async function waitHealthy(timeoutMs, procs, extra = []) {
   const deadline = Date.now() + timeoutMs;
-  const pending = new Map(HEALTH);
+  const pending = new Map([...extra, ...HEALTH]);
   while (pending.size && Date.now() < deadline) {
     for (const p of procs) if (p.exitCode !== null) throw new Error(`${p.name} exited early (code ${p.exitCode}); see ${p.logFile}`);
     for (const [name, url] of [...pending]) {
@@ -176,6 +178,9 @@ export async function startStack(opts = {}) {
     },
     { name: 'gateway', args: ['scripts/gateway.mjs'], env: {}, plain: true },
   ];
+  // The scripted stand-in as its own process (only when asked for), so `--claude-standin` works
+  // detached too (dev:reset runs in the background like every other reset).
+  if (opts.standinPort) specs.unshift({ name: 'claude-standin', args: ['e2e/claude-standin.mjs', String(opts.standinPort)], env: {}, plain: true });
 
   const procs = [];
   const stop = async () => {
@@ -206,7 +211,7 @@ export async function startStack(opts = {}) {
     for (const s of specs) {
       const logFile = join(logDir, `${s.name}.log`);
       const fd = openSync(logFile, 'a');
-      const nodeArgs = s.plain ? [...preload, s.args[0]] : ['--import', 'tsx', ...preload, ...s.args];
+      const nodeArgs = s.plain ? [...preload, ...s.args] : ['--import', 'tsx', ...preload, ...s.args];
       const child = spawn(process.execPath, nodeArgs, {
         cwd: POC_DIR,
         env: serviceEnv({ ...common, ...watch(s.name), ...s.env }),
@@ -224,7 +229,7 @@ export async function startStack(opts = {}) {
       log(`started ${s.name} (pid ${child.pid}); log ${logFile}`);
     }
     writeFileSync(PID_FILE, JSON.stringify(procs.map((p) => ({ name: p.name, pid: p.pid })), null, 1));
-    await waitHealthy(opts.healthTimeoutMs ?? 120_000, procs);
+    await waitHealthy(opts.healthTimeoutMs ?? 120_000, procs, opts.standinPort ? [['claude-standin', `http://127.0.0.1:${opts.standinPort}/health`]] : []);
   } catch (err) {
     await stop();
     throw err;
@@ -292,22 +297,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     }
     if (cmd !== 'up' && cmd !== 'reset') throw new Error(`unknown command ${cmd} (up | reset | down)`);
     if (cmd === 'reset') await stopFromPidFile();
-    let standin = null;
-    if (flag('claude-standin')) {
-      const { startStandin } = await import('../e2e/claude-standin.mjs');
-      standin = await startStandin({ port: 0 });
-      console.log(`\n  !! Claude is the SCRIPTED TEST STAND-IN (poc/e2e/claude-standin.mjs), not the real API. Answers are canned. !!\n`);
-      if (!flag('detach') && cmd !== 'reset') {
-        /* stays in this process */
-      } else console.log('  (the stand-in runs inside this process, so --detach is ignored with --claude-standin)');
-    }
-    const detach = (flag('detach') || cmd === 'reset') && !standin;
+    const standin = flag('claude-standin');
+    if (standin) console.log(`\n  !! Claude is the SCRIPTED TEST STAND-IN (poc/e2e/claude-standin.mjs), not the real API. Answers are canned. !!\n`);
+    const detach = flag('detach') || cmd === 'reset';
     const stack = await startStack({
       detach,
       reset: cmd === 'reset' || flag('reset'),
       now: value('now'),
       skipBuild: flag('skip-build'),
-      ...(standin ? { claudeBaseUrl: standin.url, apiKey: 'standin-not-a-real-key', claudeLabel: 'the scripted test stand-in' } : {}),
+      ...(standin ? { standinPort: STANDIN_PORT, claudeBaseUrl: `http://127.0.0.1:${STANDIN_PORT}`, apiKey: 'standin-not-a-real-key', claudeLabel: 'the scripted test stand-in' } : {}),
     });
     banner(standin ? 'Claude: SCRIPTED TEST STAND-IN' : '');
     if (detach) {
@@ -321,7 +319,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       stopping = true;
       console.log('\n[dev] stopping ...');
       await stack.stop();
-      await standin?.close();
       process.exit(0);
     };
     process.on('SIGINT', shutdown);

@@ -6,7 +6,8 @@
  * holds read-only connectors).
  */
 import { randomUUID } from 'node:crypto';
-import type { ChatMessage, MailMessage, PmClient, PmTask, SourceRef, Suggestion } from '@poc/contracts';
+import { addDaysIso, zonedTime, type ChatMessage, type MailMessage, type PmClient, type PmTask, type SourceRef, type Suggestion, type TimeSlot } from '@poc/contracts';
+import { findMeetingSlots, meetingMinutes, preferredSlots } from '../prepare/slots';
 import { ClaudeMaxTokensError, ClaudeOutputError, ClaudeRefusalError, SpendCapError, type Claude } from '../claude';
 import type { BrainConfig } from '../config';
 import type { ReadConnectors } from '../guard';
@@ -42,6 +43,40 @@ const RETRY_BACKOFF_MS = 30_000;
 function snippet(s: string, n = 60): string {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+}
+
+/** Words of a title, for the repeat check: lower case, no punctuation, no filler words. */
+const FILLER = new Set(['a', 'an', 'the', 'to', 'on', 'for', 'with', 'about', 'please', 'task', 'add']);
+function titleWords(title: string): Set<string> {
+  return new Set(title.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter((w) => w && !FILLER.has(w)));
+}
+
+/**
+ * Code-side duplicate guard: a new task whose title matches (nearly word for
+ * word) a pending create_task suggestion or an open task for the same client
+ * (and the same due date, when both have one) is flagged as a possible duplicate.
+ */
+export function repeatOf(title: string, clientId: string | null, dueDate: string | null, pending: Suggestion[], tasks: PmTask[]): { kind: 'task' | 'suggestion'; id: string } | null {
+  const w = titleWords(title);
+  if (!w.size) return null;
+  const close = (other: string) => {
+    const o = titleWords(other);
+    const inter = [...w].filter((x) => o.has(x)).length;
+    return inter / new Set([...w, ...o]).size >= 0.8;
+  };
+  const sameDay = (d: string | null) => !dueDate || !d || d === dueDate;
+  const sameClient = (c: string | null) => !clientId || !c || c === clientId;
+  const s = pending.find((x) => x.kind === 'create_task' && sameClient(x.clientId) && sameDay(x.payload.dueDate) && close(x.payload.title));
+  if (s) return { kind: 'suggestion', id: s.id };
+  const t = tasks.find((x) => !x.done && sameClient(x.clientId) && sameDay(x.dueDate) && close(x.title));
+  return t ? { kind: 'task', id: t.id } : null;
+}
+
+/** The FYI line for a client message that gave nothing to act on. Code-made, so message text cannot steer it. */
+function fyiText(item: TriageItem, source: SourceRef): string {
+  const who = /^(?:Email|Chat message) from ([^<]+?) </.exec(item.header)?.[1]?.trim() ?? 'Someone';
+  const what = item.subject ? `"${snippet(item.subject, 70)}"` : `"${snippet(item.body, 70)}"`;
+  return `FYI: ${who} ${source.connector === 'chat' ? 'messaged you' : 'emailed you'} ${what}. I found nothing for you to act on, so I haven't suggested anything. Open it to check.`;
 }
 
 export class IntakeService {
@@ -191,14 +226,17 @@ export class IntakeService {
         profiles,
         openTasks,
         pendingSuggestions: pending,
+        proposeDueDates: this.d.config.proposeDueDates ?? true,
       });
     } catch (err) {
       return this.onTriageError(source, err as Error, opts.rethrow ?? false);
     }
 
-    const suggestions = await this.store(source, triage, candidates);
-    if (suggestions.length && source.connector !== 'manual' && source.connector !== 'voice') {
-      this.d.nudges.add({ kind: 'new_item', text: triage.nudge || source.label, source, suggestionIds: suggestions.map((s) => s.id) });
+    const suggestions = await this.store(source, triage, candidates, item, myTasks);
+    if (source.connector !== 'manual' && source.connector !== 'voice') {
+      if (suggestions.length) this.d.nudges.add({ kind: 'new_item', text: triage.nudge || source.label, source, suggestionIds: suggestions.map((s) => s.id) });
+      // A client message never disappears silently: nothing to act on still gets a low-key FYI with the source link.
+      else this.d.nudges.add({ kind: 'info', text: fyiText(item, source), source });
     }
     this.d.registry.emit('onMessageTriaged', { source, item, ...original, triage, suggestions, candidates });
     return { kind: 'done', suggestions };
@@ -230,10 +268,27 @@ export class IntakeService {
     return { kind: 'retry', error: err };
   }
 
-  private async store(source: SourceRef, t: TriageOutput, candidates: Candidate[]): Promise<Suggestion[]> {
+  /** Candidate meeting times for a schedule-meeting suggestion, computed in code from the calendar (none on a calendar outage). */
+  private async meetingSlots(item: TriageItem, title: string): Promise<TimeSlot[]> {
+    const { clock } = this.d.config;
+    const today = clock.today();
+    try {
+      const events = await this.d.read.calendar.view(zonedTime(today, 0, clock.tz).toISOString(), zonedTime(addDaysIso(today, 15), 0, clock.tz).toISOString());
+      const ask = `${title}\n${item.subject ?? ''}\n${item.body}`;
+      return preferredSlots(findMeetingSlots(events, { now: clock.now(), tz: clock.tz, durationMin: meetingMinutes(ask) }), ask, clock.tz, today, 3);
+    } catch (err) {
+      this.d.log(`meeting slots for a suggestion skipped: ${(err as Error).message}`);
+      return [];
+    }
+  }
+
+  private async store(source: SourceRef, t: TriageOutput, candidates: Candidate[], item: TriageItem, myTasks: PmTask[]): Promise<Suggestion[]> {
     if (!t.tasks.length) return [];
     const me = this.d.config.me.id;
-    const taskInputs: NewSuggestion[] = t.tasks.map((task) => ({
+    const pendingNow = this.d.suggestions.list().filter((s) => s.status === 'pending' && s.kind === 'create_task');
+    const slotsFor = new Map<number, TimeSlot[]>();
+    for (const [i, task] of t.tasks.entries()) if (task.taskType === 'schedule_meeting' && !task.duplicateOf) slotsFor.set(i, await this.meetingSlots(item, task.title));
+    const taskInputs: NewSuggestion[] = t.tasks.map((task, i) => ({
       kind: 'create_task',
       title: task.title,
       nudge: t.nudge,
@@ -242,8 +297,9 @@ export class IntakeService {
       source,
       direction: task.direction,
       taskType: task.taskType,
-      duplicateOf: task.duplicateOf,
-      payload: { title: task.title, dueDate: task.dueDate, assigneeIds: [me] },
+      // Claude's judgement first; a code check catches exact and near-exact repeats it missed (D12).
+      duplicateOf: task.duplicateOf ?? repeatOf(task.title, t.clientId, task.dueDate, pendingNow, myTasks),
+      payload: { title: task.title, dueDate: task.dueDate, assigneeIds: [me], ...(slotsFor.get(i)?.length ? { slots: slotsFor.get(i)! } : {}) },
     }));
     const tasks = await this.d.suggestions.addMany(taskInputs);
     if (t.confidence === 'high' && t.clientId) return tasks;

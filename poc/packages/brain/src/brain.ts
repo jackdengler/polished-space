@@ -14,6 +14,8 @@ import {
   zonedTime,
   type CalEvent,
   type FileView,
+  type MailMessage,
+  type SourceMessage,
   type PmClient,
   type PmTask,
   type SidebarState,
@@ -89,7 +91,7 @@ export class Brain {
     this.suggestions = new SuggestionStore(join(dir, DATA_LAYOUT.brainSuggestions), deps.config.clock);
     this.taskMeta = new TaskMetaStore(join(dir, DATA_LAYOUT.brainTaskMeta));
     this.cursors = new CursorStore(join(dir, DATA_LAYOUT.brainCursors));
-    this.nudges = new NudgeStore(deps.config.clock);
+    this.nudges = new NudgeStore(deps.config.clock, join(dir, 'brain', 'nudges.json'));
     this.profiles = new ProfileFiles(join(dir, DATA_LAYOUT.profiles));
     this.writes = guardConnectors(deps.connectors);
     this.read = readOnly(this.writes);
@@ -101,6 +103,7 @@ export class Brain {
       this.sse.broadcast('nudge', n);
       this.stateChanged();
     });
+    this.nudges.onChange(() => this.stateChanged());
 
     this.intake = new IntakeService({
       config: this.config,
@@ -136,7 +139,7 @@ export class Brain {
 
   /** Load state and initialise modules. Call once before start() or tick(). */
   async init(): Promise<void> {
-    await Promise.all([this.suggestions.load(), this.taskMeta.load(), this.cursors.load(), this.usage.load()]);
+    await Promise.all([this.suggestions.load(), this.taskMeta.load(), this.cursors.load(), this.usage.load(), this.nudges.load()]);
     for (const m of this.modules) {
       if (boundModules.has(m)) throw new Error(`module "${m.name}" is already bound to another brain; use createModules() for fresh instances`);
       boundModules.add(m);
@@ -333,7 +336,7 @@ export class Brain {
         upsert: (id, patch) => this.taskMeta.upsert(id, patch),
         upsertMany: (entries) => this.taskMeta.upsertMany(entries),
       },
-      nudges: { add: (n) => this.nudges.add(n) },
+      nudges: { add: (n) => this.nudges.add(n), remove: (match) => this.nudges.remove(match), retext: (id, text) => this.nudges.retext(id, text), list: () => this.nudges.list() },
       intake: { submitText: (text, connector) => this.intake.submitText(text, connector) },
       state: { build: () => this.buildState(), changed: () => this.stateChanged() },
       myTasks: () => this.myTasks(),
@@ -390,6 +393,7 @@ export class Brain {
       sendJson(res, 200, await this.setHold(params.id!, parsed.data.onHold));
     });
     add('GET', PATHS.brain.usage, ({ res }) => sendJson(res, 200, this.usage.response()));
+    add('GET', '/api/sources/:connector/:id', async ({ res, params }) => sendJson(res, 200, await this.sourceMessage(params.connector!, params.id!)));
     add('GET', PATHS.brain.files, async ({ res, url }) => sendJson(res, 200, await this.fileView(url.searchParams.get('path'))));
     add('GET', PATHS.brain.filesRaw, async ({ res, url }) => {
       const file = await this.readClientFile(url.searchParams.get('path'));
@@ -398,6 +402,25 @@ export class Brain {
       res.writeHead(200, { 'content-type': file.mimeType === 'application/pdf' ? 'application/pdf' : `${file.mimeType}; charset=utf-8`, 'content-length': body.length, 'content-disposition': `inline; filename*=UTF-8''${name}`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
       res.end(body);
     });
+  }
+
+  /** `GET /api/sources/:connector/:id`: the original email or chat message behind a source link (read only). */
+  async sourceMessage(connector: string, id: string): Promise<SourceMessage> {
+    const MAX = 20_000;
+    const cut = (t: string) => ({ body: t.length > MAX ? t.slice(0, MAX) : t, truncated: t.length > MAX });
+    if (connector === 'mail') {
+      let m: MailMessage | null = await this.read.mail.get(id).catch(() => null);
+      if (!m) m = (await this.read.mail.listSent().catch(() => [] as MailMessage[])).find((x) => x.id === id) ?? null;
+      if (!m) throw new HttpProblem(404, 'That email is no longer in the mailbox.');
+      const text = m.body.contentType === 'html' ? m.body.content.replace(/<[^>]+>/g, ' ') : m.body.content;
+      return { connector: 'mail', id, from: { name: m.from.emailAddress.name, address: m.from.emailAddress.address }, to: [...m.toRecipients, ...m.ccRecipients].map((r) => r.emailAddress.address), at: m.receivedDateTime, subject: m.subject, ...cut(text) };
+    }
+    if (connector === 'chat') {
+      const c = (await this.read.chat.listSince('')).items.find((x) => x.id === id);
+      if (!c) throw new HttpProblem(404, 'That chat message is no longer there.');
+      return { connector: 'chat', id, from: { name: c.sender_display_name, address: c.sender }, to: [c.to_channel ? `#${c.channel_name ?? c.to_channel}` : 'personal chat'], at: c.date_time, subject: null, ...cut(c.message) };
+    }
+    throw new HttpProblem(400, 'Only email and chat sources can be opened here (files open in the file view).');
   }
 
   /** Read one file from the fake file server (read-only connector; paths outside its root are refused). */

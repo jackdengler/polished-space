@@ -15,6 +15,7 @@ import { ChatBody, PATHS, type SpeechToText, type Suggestion, type TextToSpeech 
 import { HttpSpeechToText, HttpTextToSpeech } from '@poc/speech/client';
 import { WebSocketServer } from 'ws';
 import { HttpProblem } from '../httpProblem';
+import { sendJson } from '../server';
 import type { ThinkingMode } from '../models';
 import type { BrainModule, ModuleContext } from '../modules/types';
 import { ChatPipeline, type PipelineOptions } from './pipeline';
@@ -81,6 +82,12 @@ export function createChatModule(opts: ChatModuleOptions = {}): ChatModule {
         chunker: opts.chunker,
         log: (m: string) => ctx.log(`voice: ${m}`),
       };
+
+      // The chat history for the Chat tab after a reload (D10): typed and spoken turns, with interrupted markers.
+      ctx.routes.add('GET', PATHS.brain.conversation, async ({ res }) => {
+        await p.conversation.load();
+        sendJson(res, 200, { turns: p.conversation.turns.slice(-100).map(({ messageStart: _a, messageEnd: _b, ...t }) => t) });
+      });
 
       ctx.routes.add('POST', PATHS.brain.chat, async ({ res, body }) => {
         const parsed = ChatBody.safeParse(await body());

@@ -66,13 +66,15 @@ export type GraphSendMailRequest = z.infer<typeof GraphSendMailRequest>;
  * message it answers; it is not sent to Graph (sendMail has no such field),
  * the subject carries "Re: ..." instead.
  */
-export const MailDraft = z.object({
-  to: z.array(Person).min(1),
-  cc: z.array(Person).default([]),
-  subject: z.string().min(1),
-  body: z.string().min(1),
-  replyToMessageId: z.string().nullable().default(null),
-});
+export const MailDraft = z
+  .object({
+    to: z.array(Person).min(1, 'add at least one recipient').max(10, 'at most 10 recipients'),
+    cc: z.array(Person).max(10, 'at most 10 people in cc').default([]),
+    subject: z.string().trim().min(1, 'add a subject').max(300),
+    body: z.string().trim().min(1, 'the message is empty'),
+    replyToMessageId: z.string().nullable().default(null),
+  })
+  .refine((d) => new Set([...d.to, ...d.cc].map((p) => p.address.toLowerCase())).size === d.to.length + d.cc.length, { message: 'the same address is listed twice', path: ['to'] });
 export type MailDraft = z.infer<typeof MailDraft>;
 
 const toRecipient = (p: Person): GraphRecipient => ({ emailAddress: { name: p.name, address: p.address } });

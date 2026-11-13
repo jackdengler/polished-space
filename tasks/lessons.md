@@ -12,3 +12,8 @@
 - **Rule:** Before every commit made while real data is around, grep the staged diff for names from that data, excluding the app's own name ("compensian" matches "Compensia").
 - **Repeat slip (caught before pushing):** while building the name matcher I used real colleague names as examples in code comments and a commit message. The pre-commit name scan and the permission check caught it before anything was pushed.
 - **Rule, reinforced:** write fictional examples first, before any real data is in view. When the code is *about* the real data (matching names), the temptation is highest, so always run the staged-diff name scan before composing the commit message, and never put real names in commit messages.
+
+## Check the remote before saying what a repo contains
+- **Mistake:** I told the user the repo was a different app, twice, from a clone whose `main` was stale. The real app had been merged on the remote. The user had to say "check again".
+- **Rule:** Before stating what a repo is or is not, run `git fetch` and look at the remote default branch and the other branches.
+- **Rule:** When the user doubts a factual claim, re-verify from the source before repeating it.

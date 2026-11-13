@@ -31,8 +31,14 @@ export type SuggestionStatus = z.infer<typeof SuggestionStatus>;
 export const CreateTaskPayload = z.object({
   title: z.string().trim().min(1),
   dueDate: IsoDate.nullable(),
-  assigneeIds: z.array(z.string()).default([]),
+  assigneeIds: z.array(z.string().min(1)).default([]),
   deliverableId: z.string().optional(),
+  /**
+   * For a schedule_meeting task: candidate meeting times computed in code from
+   * the calendar when the suggestion was made (shown on the card, reused by the
+   * prepared work). Not sent to Planr.
+   */
+  slots: z.array(TimeSlot).max(5).optional(),
 });
 export type CreateTaskPayload = z.infer<typeof CreateTaskPayload>;
 
@@ -43,14 +49,17 @@ export const RescheduleTaskPayload = z.object({ taskId: z.string().min(1), dueDa
 export type RescheduleTaskPayload = z.infer<typeof RescheduleTaskPayload>;
 
 /** A time block written to the calendar on approve (lunch, or focus time for a task). */
-export const CalendarBlockPayload = z.object({
-  subject: z.string().min(1),
-  start: IsoDateTime,
-  end: IsoDateTime,
-  purpose: z.enum(['lunch', 'focus']),
-  /** For a focus block: the task it is for. */
-  taskId: z.string().nullable().default(null),
-});
+export const CalendarBlockPayload = z
+  .object({
+    subject: z.string().trim().min(1),
+    start: IsoDateTime,
+    end: IsoDateTime,
+    purpose: z.enum(['lunch', 'focus']),
+    /** For a focus block: the task it is for. */
+    taskId: z.string().nullable().default(null),
+  })
+  .refine((p) => Date.parse(p.end) > Date.parse(p.start), { message: 'The block must end after it starts.', path: ['end'] })
+  .refine((p) => Date.parse(p.end) - Date.parse(p.start) <= 12 * 3_600_000, { message: 'A block can be at most 12 hours long.', path: ['end'] });
 export type CalendarBlockPayload = z.infer<typeof CalendarBlockPayload>;
 
 /**
@@ -192,6 +201,8 @@ export const TaskMeta = z.object({
   prepared: PreparedWork.nullable().default(null),
   preparedStatus: PreparedStatus.default('none'),
   preparedSuggestionId: z.string().nullable().default(null),
+  /** For a meeting task: the candidate times shown on its suggestion card (reused by prepared work while still free). */
+  meetingSlots: z.array(TimeSlot).default([]),
 });
 export type TaskMeta = z.infer<typeof TaskMeta>;
 
